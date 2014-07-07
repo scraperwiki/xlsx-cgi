@@ -36,12 +36,6 @@ func ColumnTypes(db *sql.DB, tablename string) ([]string, *[]interface{}, []inte
 
 		var item interface{}
 
-		switch type_ {
-		case "text":
-			// item = sql.RawBytes{}
-		}
-
-		// valuesPointers[index] = &values[index]
 		values = append(values, item)
 		valuesPointers = append(valuesPointers, &values[len(values)-1])
 	}
@@ -58,11 +52,6 @@ func main() {
 	if err != nil {
 		log.Fatal("db, err :=", db, err)
 	}
-
-	// cols, values, scanArgs, err := ColumnTypes(db, "tweets")
-	// if err != nil {
-	//  log.Fatal(err)
-	// }
 
 	rowCount, err := db.Query("SELECT COUNT(*) FROM tweets")
 	if err != nil {
@@ -96,14 +85,8 @@ func main() {
 		scanArgs[i] = &values[i]
 	}
 
-	// c := 0
-
 	out := csv.NewWriter(os.Stdout)
 	_ = out
-
-	// r := make([]string, len(values))
-
-	// rr = make([]xlsx.Cell, len(values))
 
 	var c []xlsx.Column
 
@@ -151,18 +134,6 @@ func main() {
 					Value: fmt.Sprintf("%s", v),
 				}
 
-				_ = `
-			case []byte:
-				_ = v
-				// out.Write(fmt.Sprint(v))
-				//r[i] = string(v)
-				//os.Stdout.Write(v)
-			default:
-				_ = v
-				// out.Write(fmt.Sprint(v))
-				//r[i] = fmt.Sprint(v)
-				//fmt.Fprintln(os.Stdout, v)
-            `
 			}
 
 		}
@@ -177,42 +148,4 @@ func main() {
 		panic(err)
 	}
 
-	// log.Printf("Queried %v rows", c)
-
-	// cols, err := rows.Columns()
-	// if err != nil {
-	//  log.Fatal(err)
-	// }
-	// values := make([]interface{}, len(cols))
-	// scanArgs := make([]interface{}, len(cols))
-	// for i := range values {
-	//  scanArgs[i] = &values[i]
-	// }
-
-	// rows.Next()
-	// err = rows.Scan(scanArgs...)
-	// if err != nil {
-	//  log.Fatal(err)
-	// }
-
-	// // result := make([]sql.RawBytes, len(cols))
-	// // resultp := make([]interface{}, len(cols))
-	// // for i := range result {
-	// //   resultp[i] = &result[i]
-	// // }
-
-	// // rows.Next()
-	// // err = rows.Scan(resultp...)
-	// // if err != nil {
-	// //   log.Fatal(err)
-	// // }
-
-	// for i, c := range cols {
-	//  v := values[i]
-	//  _, ok := v.([]byte)
-	//  if ok {
-	//      values[i] = string(v.([]byte))
-	//  }
-	//  log.Printf("%30s %10T %v", c, values[i], values[i])
-	// }
 }
