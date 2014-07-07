@@ -6,8 +6,10 @@ import (
 	"encoding/csv"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"strconv"
+	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/psmithuk/xlsx"
@@ -58,8 +60,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	rowCount.Scan(os.Stdout)
-
 	cols, _ := rowCount.Columns()
 	countValues := make([]interface{}, len(cols))
 	scanArgs := make([]interface{}, len(cols))
@@ -71,9 +71,12 @@ func main() {
 	rowCount.Scan(scanArgs...)
 
 	rowNum := countValues[0].(int64)
-	_ = rowNum
 
-	rows, err := db.Query("SELECT * FROM tweets limit 10")
+	n := 10
+
+	query_num := int(math.Ceil(float64(rowNum) / float64(10)))
+
+	rows, err := db.Query("SELECT * FROM tweets limit 1")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -100,46 +103,58 @@ func main() {
 
 	sh := xlsx.NewSheetWithColumns(c)
 	sw, err := ww.NewSheetWriter(&sh)
+	_ = query_num
 
-	for rows.Next() {
-
-		err = rows.Scan(scanArgs...)
+	for i := 0; i < 1000; i++ {
+		rows, err := db.Query(fmt.Sprintf("SELECT * FROM tweets LIMIT %v OFFSET %v", n, i+1*n))
 		if err != nil {
-			panic(err)
+			log.Fatal(err)
 		}
 
-		r := sh.NewRow()
+		for rows.Next() {
 
-		for i, v := range values {
+			err = rows.Scan(scanArgs...)
+			if err != nil {
+				panic(err)
+			}
 
-			switch v := v.(type) {
-			case nil:
-				r.Cells[i] = xlsx.Cell{
-					Type:  xlsx.CellTypeInlineString,
-					Value: "",
-				}
-			case uint64:
-				r.Cells[i] = xlsx.Cell{
-					Type:  xlsx.CellTypeNumber,
-					Value: strconv.FormatUint(v, 10),
-				}
-			case int64:
-				r.Cells[i] = xlsx.Cell{
-					Type:  xlsx.CellTypeNumber,
-					Value: strconv.FormatInt(v, 10),
-				}
-			default:
-				r.Cells[i] = xlsx.Cell{
-					Type:  xlsx.CellTypeInlineString,
-					Value: fmt.Sprintf("%s", v),
+			r := sh.NewRow()
+
+			for i, v := range values {
+
+				switch v := v.(type) {
+				case nil:
+					r.Cells[i] = xlsx.Cell{
+						Type:  xlsx.CellTypeInlineString,
+						Value: "",
+					}
+				case uint64:
+					r.Cells[i] = xlsx.Cell{
+						Type:  xlsx.CellTypeNumber,
+						Value: strconv.FormatUint(v, 10),
+					}
+				case int64:
+					r.Cells[i] = xlsx.Cell{
+						Type:  xlsx.CellTypeNumber,
+						Value: strconv.FormatInt(v, 10),
+					}
+				case time.Time:
+					r.Cells[i] = xlsx.Cell{
+						Type:  xlsx.CellTypeDatetime,
+						Value: v.String(),
+					}
+				default:
+					r.Cells[i] = xlsx.Cell{
+						Type:  xlsx.CellTypeInlineString,
+						Value: fmt.Sprintf("%s", v),
+					}
 				}
 
 			}
-
+			err = sw.WriteRows([]xlsx.Row{r})
 		}
-		err = sw.WriteRows([]xlsx.Row{r})
+		rows.Close()
 	}
-	rows.Close()
 
 	err = ww.Close()
 	defer w.Flush()
