@@ -88,6 +88,9 @@ func main() {
 		scanArgs[i] = &values[i]
 	}
 
+	rows.Next()
+	rows.Scan(scanArgs...)
+
 	out := csv.NewWriter(os.Stdout)
 	_ = out
 
@@ -141,7 +144,7 @@ func main() {
 				case time.Time:
 					r.Cells[i] = xlsx.Cell{
 						Type:  xlsx.CellTypeDatetime,
-						Value: v.String(),
+						Value: v.Format(time.RFC3339),
 					}
 				default:
 					r.Cells[i] = xlsx.Cell{
