@@ -2,16 +2,20 @@ package main
 
 import (
 	"database/sql"
+	"flag"
 	"fmt"
 	"log"
 	"math"
 	"os"
+	"runtime/pprof"
 	"strconv"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/psmithuk/xlsx"
 )
+
+var memprofile = flag.String("memprofile", "", "write memory profile to this file")
 
 func ColumnTypes(db *sql.DB, tablename string) ([]string, *[]interface{}, []interface{}, error) {
 	rows, err := db.Query(fmt.Sprintf("PRAGMA TABLE_INFO(%s)", tablename))
@@ -48,6 +52,18 @@ func ColumnTypes(db *sql.DB, tablename string) ([]string, *[]interface{}, []inte
 }
 
 func main() {
+	flag.Parse()
+
+	if *memprofile != "" {
+		f, err := os.Create(*memprofile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.WriteHeapProfile(f)
+		f.Close()
+		return
+	}
+
 	db, err := sql.Open("sqlite3", "scraperwiki.sqlite")
 	if err != nil {
 		log.Fatal("db, err :=", db, err)
@@ -102,7 +118,7 @@ func main() {
 	sh := xlsx.NewSheetWithColumns(c)
 	sw, err := ww.NewSheetWriter(&sh)
 
-	for i := 0; i < 500; i++ {
+	for i := 0; i < 10; i++ {
 		rows, err := db.Query(fmt.Sprintf("SELECT * FROM tweets LIMIT %v OFFSET %v", n, i+1*n))
 		if err != nil {
 			log.Fatal(err)
@@ -148,6 +164,7 @@ func main() {
 
 			}
 
+			_ = sw
 			err = sw.WriteRows([]xlsx.Row{r})
 		}
 		rows.Close()
