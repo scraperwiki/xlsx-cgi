@@ -1,9 +1,7 @@
 package main
 
 import (
-	"bufio"
 	"database/sql"
-	"encoding/csv"
 	"fmt"
 	"log"
 	"math"
@@ -74,7 +72,8 @@ func main() {
 
 	n := 10
 
-	query_num := int(math.Ceil(float64(rowNum) / float64(10)))
+	queryNum := int(math.Ceil(float64(rowNum) / float64(10)))
+	_ = queryNum
 
 	rows, err := db.Query("SELECT * FROM tweets limit 1")
 	if err != nil {
@@ -91,9 +90,6 @@ func main() {
 	rows.Next()
 	rows.Scan(scanArgs...)
 
-	out := csv.NewWriter(os.Stdout)
-	_ = out
-
 	var c []xlsx.Column
 
 	for _, colName := range cols {
@@ -101,14 +97,12 @@ func main() {
 	}
 
 	outputfile, err := os.Create("test.xlsx")
-	w := bufio.NewWriter(outputfile)
-	ww := xlsx.NewWorkbookWriter(w)
+	ww := xlsx.NewWorkbookWriter(outputfile)
 
 	sh := xlsx.NewSheetWithColumns(c)
 	sw, err := ww.NewSheetWriter(&sh)
-	_ = query_num
 
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 500; i++ {
 		rows, err := db.Query(fmt.Sprintf("SELECT * FROM tweets LIMIT %v OFFSET %v", n, i+1*n))
 		if err != nil {
 			log.Fatal(err)
@@ -122,7 +116,6 @@ func main() {
 			}
 
 			r := sh.NewRow()
-
 			for i, v := range values {
 
 				switch v := v.(type) {
@@ -154,13 +147,13 @@ func main() {
 				}
 
 			}
+
 			err = sw.WriteRows([]xlsx.Row{r})
 		}
 		rows.Close()
 	}
 
 	err = ww.Close()
-	defer w.Flush()
 
 	if err != nil {
 		panic(err)
