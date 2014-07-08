@@ -16,6 +16,7 @@ import (
 )
 
 var memprofile = flag.String("memprofile", "", "write memory profile to this file")
+var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
 
 func ColumnTypes(db *sql.DB, tablename string) ([]string, *[]interface{}, []interface{}, error) {
 	rows, err := db.Query(fmt.Sprintf("PRAGMA TABLE_INFO(%s)", tablename))
@@ -54,14 +55,13 @@ func ColumnTypes(db *sql.DB, tablename string) ([]string, *[]interface{}, []inte
 func main() {
 	flag.Parse()
 
-	if *memprofile != "" {
-		f, err := os.Create(*memprofile)
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
 		if err != nil {
 			log.Fatal(err)
 		}
-		pprof.WriteHeapProfile(f)
-		f.Close()
-		return
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
 	}
 
 	db, err := sql.Open("sqlite3", "scraperwiki.sqlite")
@@ -118,7 +118,7 @@ func main() {
 	sh := xlsx.NewSheetWithColumns(c)
 	sw, err := ww.NewSheetWriter(&sh)
 
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 100; i++ {
 		rows, err := db.Query(fmt.Sprintf("SELECT * FROM tweets LIMIT %v OFFSET %v", n, i+1*n))
 		if err != nil {
 			log.Fatal(err)
@@ -174,6 +174,16 @@ func main() {
 
 	if err != nil {
 		panic(err)
+	}
+
+	if *memprofile != "" {
+		f, err := os.Create(*memprofile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.WriteHeapProfile(f)
+		f.Close()
+		return
 	}
 
 }
