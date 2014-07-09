@@ -34,7 +34,11 @@ func ColumnTypes(db *sql.DB, tablename string) ([]xlsx.Column, []interface{}, []
 		return nil, nil, nil, err
 	}
 
-	cols, _ := rows.Columns()
+	cols, err := rows.Columns()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
 	values := make([]interface{}, len(cols))
 	scanArgs := make([]interface{}, len(cols))
 	for i := range values {
@@ -42,7 +46,10 @@ func ColumnTypes(db *sql.DB, tablename string) ([]xlsx.Column, []interface{}, []
 	}
 
 	rows.Next()
-	rows.Scan(scanArgs...)
+	err = rows.Scan(scanArgs...)
+	if err != nil {
+		return nil, nil, nil, err
+	}
 
 	var c []xlsx.Column
 
@@ -104,10 +111,9 @@ func main() {
 	}
 
 	rowCount, err := RowCount(db, "tweets")
-	n := 10
-
-	queryNum := int(math.Ceil(float64(rowCount) / float64(10)))
-	_ = queryNum
+	if err != nil {
+		panic(err)
+	}
 
 	cols, values, scanArgs, err := ColumnTypes(db, "tweets")
 	if err != nil {
