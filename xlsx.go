@@ -19,19 +19,12 @@ var memprofile = flag.String("memprofile", "", "write memory profile to this fil
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
 
 func RowCount(db *sql.DB, tablename string) (int, error) {
-	rows, err := db.Query("SELECT COUNT(*) FROM tablename=?", tablename)
-	if err != nil {
-		return 0, err
-	}
-
-	defer rows.Close()
-	rows.Next()
+	row := db.QueryRow("SELECT COUNT(*) FROM tablename=?", tablename)
 	var rowCount int
-	err = rows.Scan(&rowCount)
+	err := row.Scan(&rowCount)
 	if err != nil {
 		return 0, err
 	}
-
 	return rowCount, nil
 }
 
