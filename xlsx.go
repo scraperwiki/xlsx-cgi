@@ -18,38 +18,46 @@ import (
 var memprofile = flag.String("memprofile", "", "write memory profile to this file")
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
 
-func ColumnTypes(db *sql.DB, tablename string) ([]string, *[]interface{}, []interface{}, error) {
-	rows, err := db.Query(fmt.Sprintf("PRAGMA TABLE_INFO(%s)", tablename))
+func RowCount(db *sql.DB, tablename string) (int, error) {
+	rows, err := db.Query("SELECT COUNT(*) FROM tablename=?", tablename)
+	if err != nil {
+		return 0, err
+	}
+
+	defer rows.Close()
+	rows.Next()
+	var rowCount int
+	err = rows.Scan(&rowCount)
+	if err != nil {
+		return 0, err
+	}
+
+	return rowCount, nil
+}
+
+func ColumnTypes(db *sql.DB, tablename string) ([]xlsx.Column, []interface{}, []interface{}, error) {
+	rows, err := db.Query(fmt.Sprintf("SELECT * FROM %s limit 1", tablename))
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
-	values := []interface{}{}
-	valuesPointers := []interface{}{}
-	columns := []string{}
-
-	for rows.Next() {
-
-		var type_, name string
-		var x interface{}
-		err = rows.Scan(&x, &name, &type_, &x, &x, &x)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-
-		columns = append(columns, name)
-
-		var item interface{}
-
-		values = append(values, item)
-		valuesPointers = append(valuesPointers, &values[len(values)-1])
+	cols, _ := rows.Columns()
+	values := make([]interface{}, len(cols))
+	scanArgs := make([]interface{}, len(cols))
+	for i := range values {
+		scanArgs[i] = &values[i]
 	}
 
-	if rows.Err() != nil {
-		return nil, nil, nil, err
+	rows.Next()
+	rows.Scan(scanArgs...)
+
+	var c []xlsx.Column
+
+	for _, colName := range cols {
+		c = append(c, xlsx.Column{Name: colName, Width: 10})
 	}
 
-	return columns, &values, valuesPointers, nil
+	return c, values, scanArgs, nil
 }
 
 func main() {
@@ -69,56 +77,24 @@ func main() {
 		log.Fatal("db, err :=", db, err)
 	}
 
-	rowCount, err := db.Query("SELECT COUNT(*) FROM tweets")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	cols, _ := rowCount.Columns()
-	countValues := make([]interface{}, len(cols))
-	scanArgs := make([]interface{}, len(cols))
-	for i := range countValues {
-		scanArgs[i] = &countValues[i]
-	}
-
-	rowCount.Next()
-	rowCount.Scan(scanArgs...)
-
-	rowNum := countValues[0].(int64)
-
+	rowCount, err := RowCount(db, "tweets")
 	n := 10
 
-	queryNum := int(math.Ceil(float64(rowNum) / float64(10)))
+	queryNum := int(math.Ceil(float64(rowCount) / float64(10)))
 	_ = queryNum
 
-	rows, err := db.Query("SELECT * FROM tweets limit 1")
+	cols, values, scanArgs, err := ColumnTypes(db, "tweets")
 	if err != nil {
-		log.Fatal(err)
-	}
-
-	cols, _ = rows.Columns()
-	values := make([]interface{}, len(cols))
-	scanArgs = make([]interface{}, len(cols))
-	for i := range values {
-		scanArgs[i] = &values[i]
-	}
-
-	rows.Next()
-	rows.Scan(scanArgs...)
-
-	var c []xlsx.Column
-
-	for _, colName := range cols {
-		c = append(c, xlsx.Column{Name: colName, Width: 10})
+		panic(err)
 	}
 
 	outputfile, err := os.Create("test.xlsx")
 	ww := xlsx.NewWorkbookWriter(outputfile)
 
-	sh := xlsx.NewSheetWithColumns(c)
+	sh := xlsx.NewSheetWithColumns(cols)
 	sw, err := ww.NewSheetWriter(&sh)
 
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 2000; i++ {
 		rows, err := db.Query(fmt.Sprintf("SELECT * FROM tweets LIMIT %v OFFSET %v", n, i+1*n))
 		if err != nil {
 			log.Fatal(err)
