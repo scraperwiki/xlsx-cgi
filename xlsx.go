@@ -53,6 +53,39 @@ func ColumnTypes(db *sql.DB, tablename string) ([]xlsx.Column, []interface{}, []
 	return c, values, scanArgs, nil
 }
 
+func PopulateRow(r xlsx.Row, values []interface{}) error {
+	for i, v := range values {
+		switch v := v.(type) {
+		case nil:
+			r.Cells[i] = xlsx.Cell{
+				Type:  xlsx.CellTypeInlineString,
+				Value: "",
+			}
+		case uint64:
+			r.Cells[i] = xlsx.Cell{
+				Type:  xlsx.CellTypeNumber,
+				Value: strconv.FormatUint(v, 10),
+			}
+		case int64:
+			r.Cells[i] = xlsx.Cell{
+				Type:  xlsx.CellTypeNumber,
+				Value: strconv.FormatInt(v, 10),
+			}
+		case time.Time:
+			r.Cells[i] = xlsx.Cell{
+				Type:  xlsx.CellTypeDatetime,
+				Value: v.Format(time.RFC3339),
+			}
+		default:
+			r.Cells[i] = xlsx.Cell{
+				Type:  xlsx.CellTypeInlineString,
+				Value: fmt.Sprintf("%s", v),
+			}
+		}
+	}
+	return nil
+}
+
 func main() {
 	flag.Parse()
 
@@ -94,53 +127,26 @@ func main() {
 		}
 
 		for rows.Next() {
-
 			err = rows.Scan(scanArgs...)
 			if err != nil {
 				panic(err)
 			}
 
 			r := sh.NewRow()
-			for i, v := range values {
-
-				switch v := v.(type) {
-				case nil:
-					r.Cells[i] = xlsx.Cell{
-						Type:  xlsx.CellTypeInlineString,
-						Value: "",
-					}
-				case uint64:
-					r.Cells[i] = xlsx.Cell{
-						Type:  xlsx.CellTypeNumber,
-						Value: strconv.FormatUint(v, 10),
-					}
-				case int64:
-					r.Cells[i] = xlsx.Cell{
-						Type:  xlsx.CellTypeNumber,
-						Value: strconv.FormatInt(v, 10),
-					}
-				case time.Time:
-					r.Cells[i] = xlsx.Cell{
-						Type:  xlsx.CellTypeDatetime,
-						Value: v.Format(time.RFC3339),
-					}
-				default:
-					r.Cells[i] = xlsx.Cell{
-						Type:  xlsx.CellTypeInlineString,
-						Value: fmt.Sprintf("%s", v),
-					}
-				}
-
+			err = PopulateRow(r, values)
+			if err != nil {
+				panic(err)
 			}
 
-			_ = sw
 			err = sw.WriteRows([]xlsx.Row{r})
+			if err != nil {
+				panic(err)
+			}
 		}
 		rows.Close()
 	}
 
 	err = ww.Close()
-
 	if err != nil {
 		panic(err)
 	}
