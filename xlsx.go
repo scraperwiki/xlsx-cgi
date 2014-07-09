@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"math"
 	"os"
 	"runtime/pprof"
 	"strconv"
@@ -19,7 +18,7 @@ var memprofile = flag.String("memprofile", "", "write memory profile to this fil
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
 
 func RowCount(db *sql.DB, tablename string) (int, error) {
-	row := db.QueryRow("SELECT COUNT(*) FROM tablename=?", tablename)
+	row := db.QueryRow("SELECT COUNT(*) FROM " + tablename)
 	var rowCount int
 	err := row.Scan(&rowCount)
 	if err != nil {
@@ -126,30 +125,35 @@ func main() {
 	sh := xlsx.NewSheetWithColumns(cols)
 	sw, err := ww.NewSheetWriter(&sh)
 
-	for i := 0; i < 2000; i++ {
-		rows, err := db.Query(fmt.Sprintf("SELECT * FROM tweets LIMIT %v OFFSET %v", n, i+1*n))
+	rows, err := db.Query("SELECT * FROM tweets")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for i := 0; i < rowCount; i++ {
+		rows.Next()
+		err = rows.Scan(scanArgs...)
 		if err != nil {
-			log.Fatal(err)
+			panic(err)
 		}
 
-		for rows.Next() {
-			err = rows.Scan(scanArgs...)
-			if err != nil {
-				panic(err)
-			}
-
-			r := sh.NewRow()
-			err = PopulateRow(r, values)
-			if err != nil {
-				panic(err)
-			}
-
-			err = sw.WriteRows([]xlsx.Row{r})
-			if err != nil {
-				panic(err)
-			}
+		r := sh.NewRow()
+		err = PopulateRow(r, values)
+		if err != nil {
+			panic(err)
 		}
-		rows.Close()
+
+		err = sw.WriteRows([]xlsx.Row{r})
+		if err != nil {
+			panic(err)
+		}
+
+		values = nil
+	}
+
+	err = rows.Close()
+	if err != nil {
+		panic(err)
 	}
 
 	err = ww.Close()
