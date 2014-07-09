@@ -147,8 +147,6 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-
-		values = nil
 	}
 
 	err = rows.Close()
