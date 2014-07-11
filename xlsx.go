@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"net/http/cgi"
-	"os"
 	"strconv"
 	"time"
 
@@ -93,7 +92,9 @@ func PopulateRow(r xlsx.Row, values []interface{}) error {
 	return nil
 }
 
-func main() {
+func Handler(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+
 	db, err := sql.Open("sqlite3", "../scraperwiki.sqlite")
 	if err != nil {
 		log.Fatal("db, err :=", db, err)
@@ -114,8 +115,7 @@ func main() {
 		panic(err)
 	}
 
-	outputfile, err := os.Create(tableName + ".xlsx")
-	ww := xlsx.NewWorkbookWriter(outputfile)
+	ww := xlsx.NewWorkbookWriter(w)
 
 	sh := xlsx.NewSheetWithColumns(cols)
 	sw, err := ww.NewSheetWriter(&sh)
@@ -153,4 +153,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func main() {
+	cgi.Serve(http.HandlerFunc(Handler))
 }
