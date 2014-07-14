@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"net/http/cgi"
-	"os"
 	"strconv"
 	"time"
 
@@ -162,8 +161,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	WriteXLSX(db, w)
-	WriteXLSX(db, fileWriter)
-
 }
 
 func main() {
