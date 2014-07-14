@@ -2,11 +2,9 @@ package main
 
 import (
 	"database/sql"
-	"flag"
 	"fmt"
 	"log"
 	"os"
-	"runtime/pprof"
 	"strconv"
 	"time"
 
@@ -14,17 +12,18 @@ import (
 	"github.com/psmithuk/xlsx"
 )
 
-var memprofile = flag.String("memprofile", "", "write memory profile to this file")
-var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
+func TableName(db *sql.DB) (string, error) {
+	row := db.QueryRow("SELECT name FROM sqlite_master")
+	var tableName string
+	err := row.Scan(&tableName)
+	return tableName, err
+}
 
 func RowCount(db *sql.DB, tablename string) (int, error) {
 	row := db.QueryRow("SELECT COUNT(*) FROM " + tablename)
 	var rowCount int
 	err := row.Scan(&rowCount)
-	if err != nil {
-		return 0, err
-	}
-	return rowCount, nil
+	return rowCount, err
 }
 
 func ColumnTypes(db *sql.DB, tablename string) ([]xlsx.Column, []interface{}, []interface{}, error) {
@@ -93,39 +92,33 @@ func PopulateRow(r xlsx.Row, values []interface{}) error {
 }
 
 func main() {
-	flag.Parse()
-
-	if *cpuprofile != "" {
-		f, err := os.Create(*cpuprofile)
-		if err != nil {
-			log.Fatal(err)
-		}
-		pprof.StartCPUProfile(f)
-		defer pprof.StopCPUProfile()
-	}
-
-	db, err := sql.Open("sqlite3", "scraperwiki.sqlite")
+	db, err := sql.Open("sqlite3", "../scraperwiki.sqlite")
 	if err != nil {
 		log.Fatal("db, err :=", db, err)
 	}
 
-	rowCount, err := RowCount(db, "tweets")
+	tableName, err := TableName(db)
+	if err != nil {
+		fmt.Printf("%s\n", err)
+	}
+
+	rowCount, err := RowCount(db, tableName)
 	if err != nil {
 		panic(err)
 	}
 
-	cols, values, scanArgs, err := ColumnTypes(db, "tweets")
+	cols, values, scanArgs, err := ColumnTypes(db, tableName)
 	if err != nil {
 		panic(err)
 	}
 
-	outputfile, err := os.Create("test.xlsx")
+	outputfile, err := os.Create(tableName + ".xlsx")
 	ww := xlsx.NewWorkbookWriter(outputfile)
 
 	sh := xlsx.NewSheetWithColumns(cols)
 	sw, err := ww.NewSheetWriter(&sh)
 
-	rows, err := db.Query("SELECT * FROM tweets")
+	rows, err := db.Query("SELECT * FROM " + tableName)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -158,15 +151,4 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
-	if *memprofile != "" {
-		f, err := os.Create(*memprofile)
-		if err != nil {
-			log.Fatal(err)
-		}
-		pprof.WriteHeapProfile(f)
-		f.Close()
-		return
-	}
-
 }
