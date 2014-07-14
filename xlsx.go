@@ -93,8 +93,8 @@ func PopulateRow(r xlsx.Row, values []interface{}) error {
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 	w.WriteHeader(http.StatusOK)
-	w.Header().set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 	db, err := sql.Open("sqlite3", "../scraperwiki.sqlite")
 	if err != nil {
