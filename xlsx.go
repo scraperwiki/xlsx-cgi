@@ -1,3 +1,4 @@
+w
 package main
 
 import (
@@ -6,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/cgi"
+	"os"
 	"strconv"
 	"time"
 
@@ -92,15 +94,7 @@ func PopulateRow(r xlsx.Row, values []interface{}) error {
 	return nil
 }
 
-func Handler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	w.WriteHeader(http.StatusOK)
-
-	db, err := sql.Open("sqlite3", "../scraperwiki.sqlite")
-	if err != nil {
-		log.Fatal("db, err :=", db, err)
-	}
-
+func WriteXLSX(db *sql.DB, w *io.Writer) error {
 	tableName, err := TableName(db)
 	if err != nil {
 		fmt.Printf("%s\n", err)
@@ -154,6 +148,20 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func Handler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	w.WriteHeader(http.StatusOK)
+
+	db, err := sql.Open("sqlite3", "../scraperwiki.sqlite")
+	if err != nil {
+		log.Fatal("db, err :=", db, err)
+	}
+
+	WriteXLSX(db, w)
+	WriteXLSX(db, fileWriter)
+
 }
 
 func main() {
