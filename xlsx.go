@@ -4,6 +4,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/http/cgi"
@@ -94,7 +95,7 @@ func PopulateRow(r xlsx.Row, values []interface{}) error {
 	return nil
 }
 
-func WriteXLSX(db *sql.DB, w *io.Writer) error {
+func WriteXLSX(db *sql.DB, w io.Writer) error {
 	tableName, err := TableName(db)
 	if err != nil {
 		fmt.Printf("%s\n", err)
@@ -148,6 +149,7 @@ func WriteXLSX(db *sql.DB, w *io.Writer) error {
 	if err != nil {
 		panic(err)
 	}
+	return err
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
