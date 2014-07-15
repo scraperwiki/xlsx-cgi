@@ -7,6 +7,8 @@ import (
 	"log"
 	"net/http"
 	"net/http/cgi"
+	"os"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -14,11 +16,25 @@ import (
 	"github.com/psmithuk/xlsx"
 )
 
-func TableName(db *sql.DB) (string, error) {
-	row := db.QueryRow("SELECT name FROM sqlite_master")
-	var tableName string
+func TableNames(db *sql.DB) ([]string, error) {
+	rows, err := db.Query("SELECT name FROM sqlite_master")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tableNames []string
+
+	for rows.Next() {
+		var tableName string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		append(tableNames, tableName)
+	}
+
 	err := row.Scan(&tableName)
-	return tableName, err
+	return tableNames, err
 }
 
 func RowCount(db *sql.DB, tablename string) (int, error) {
@@ -146,13 +162,26 @@ func WriteXLSX(db *sql.DB, w io.Writer, tableName string) error {
 	return err
 }
 
+func contains(s []string, e string) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
+}
+
 func Handler(w http.ResponseWriter, r *http.Request) {
+	re := regexp.MustCompile(`xlsx\/[^\/]+$`)
+	requestedTable = re.FindString(r.url)[4:]
+	log.Println(requestedTable)
+
 	db, err := sql.Open("sqlite3", "../scraperwiki.sqlite")
 	if err != nil {
 		log.Fatal("db, err :=", db, err)
 	}
 
-	tableName, err := TableName(db)
+	tableNames, err := TableNames(db)
 	if err != nil {
 		fmt.Printf("%s\n", err)
 	}
@@ -164,5 +193,12 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	f, err := os.OpenFile("testlogfile", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatalf("error opening file: %v", err)
+	}
+	defer f.Close()
+	log.SetOutput(f)
+
 	cgi.Serve(http.HandlerFunc(Handler))
 }
