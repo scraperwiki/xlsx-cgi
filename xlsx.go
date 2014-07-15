@@ -193,7 +193,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	log.Println(tableName)
 
-	w.Header().Set("Content-Disposition", "attachment; filename="+tableName)
+	w.Header().Set("Content-Disposition", "attachment; filename="+tableName+".xlsx")
 	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 	w.WriteHeader(http.StatusOK)
 	err = WriteXLSX(db, w, tableName)
