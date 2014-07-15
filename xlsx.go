@@ -205,7 +205,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", "attachment; filename="+tableName+".xlsx")
 	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 	w.WriteHeader(http.StatusOK)
+	outputfile, err := os.Create("test.xlsx")
 	err = WriteXLSX(db, w, tableName)
+	err = WriteXLSX(db, outputfile, tableName)
 	if err != nil {
 		log.Fatalf("%v", err)
 	}
