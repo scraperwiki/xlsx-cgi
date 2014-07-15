@@ -1,4 +1,3 @@
-w
 package main
 
 import (
@@ -94,12 +93,7 @@ func PopulateRow(r xlsx.Row, values []interface{}) error {
 	return nil
 }
 
-func WriteXLSX(db *sql.DB, w io.Writer) error {
-	tableName, err := TableName(db)
-	if err != nil {
-		fmt.Printf("%s\n", err)
-	}
-
+func WriteXLSX(db *sql.DB, w io.Writer, tableName string) error {
 	rowCount, err := RowCount(db, tableName)
 	if err != nil {
 		panic(err)
@@ -113,6 +107,7 @@ func WriteXLSX(db *sql.DB, w io.Writer) error {
 	ww := xlsx.NewWorkbookWriter(w)
 
 	sh := xlsx.NewSheetWithColumns(cols)
+	sh.Title = tableName
 	sw, err := ww.NewSheetWriter(&sh)
 
 	rows, err := db.Query("SELECT * FROM " + tableName)
@@ -152,15 +147,20 @@ func WriteXLSX(db *sql.DB, w io.Writer) error {
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	w.WriteHeader(http.StatusOK)
-
 	db, err := sql.Open("sqlite3", "../scraperwiki.sqlite")
 	if err != nil {
 		log.Fatal("db, err :=", db, err)
 	}
 
-	WriteXLSX(db, w)
+	tableName, err := TableName(db)
+	if err != nil {
+		fmt.Printf("%s\n", err)
+	}
+
+	w.Header().Set("Content-Disposition", "attachment; filename="+tableName)
+	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	w.WriteHeader(http.StatusOK)
+	WriteXLSX(db, w, tableName)
 }
 
 func main() {
