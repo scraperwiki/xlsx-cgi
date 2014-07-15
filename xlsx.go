@@ -188,7 +188,13 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		// TODO: Create XLSX with a sheet for each table
 		tableName = tableNames[0]
 	} else {
-		tableName = requestedTable
+		if contains(tableNames, requestedTable) {
+			println(tableName)
+			tableName = requestedTable
+		} else {
+			log.Printf("Table %s does not exist", tableName)
+		}
+
 	}
 
 	log.Println(tableName)
@@ -211,6 +217,7 @@ func main() {
 	log.SetOutput(f)
 
 	err = cgi.Serve(http.HandlerFunc(Handler))
+
 	if err != nil {
 		log.Fatalf("%v", err)
 	}
