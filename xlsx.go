@@ -9,6 +9,7 @@ import (
 	"net/http/cgi"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -171,7 +172,7 @@ func contains(s []string, e string) bool {
 
 func Handler(w http.ResponseWriter, r *http.Request) {
 	requestedTable := r.URL.Path
-	log.Println(requestedTable)
+	log.Println(requestedTable[strings.LastIndex(requestedTable, "/"):])
 
 	db, err := sql.Open("sqlite3", "../scraperwiki.sqlite")
 	if err != nil {
@@ -199,8 +200,6 @@ func main() {
 	}
 	defer f.Close()
 	log.SetOutput(f)
-
-	log.Println("test")
 
 	cgi.Serve(http.HandlerFunc(Handler))
 }
