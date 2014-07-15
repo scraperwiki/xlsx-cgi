@@ -183,6 +183,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("%s\n", err)
 	}
 
+	log.Printf("%s", tableNames)
+
 	var tableName string
 	if requestedTable == "alltables" {
 		// TODO: Create XLSX with a sheet for each table
@@ -197,7 +199,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	}
 
-	log.Println(tableName)
+	log.Println("wanted %s, got %s", requestedTable, tableName)
 
 	w.Header().Set("Content-Disposition", "attachment; filename="+tableName+".xlsx")
 	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
