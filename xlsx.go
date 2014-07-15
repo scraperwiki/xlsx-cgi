@@ -113,6 +113,7 @@ func WriteXLSX(db *sql.DB, w io.Writer, tableName string) error {
 	if err != nil {
 		panic(err)
 	}
+	log.Println(rowCount)
 
 	cols, values, scanArgs, err := ColumnTypes(db, tableName)
 	if err != nil {
