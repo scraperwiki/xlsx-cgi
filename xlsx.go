@@ -113,7 +113,6 @@ func WriteXLSX(db *sql.DB, w io.Writer, tableName string) error {
 	if err != nil {
 		panic(err)
 	}
-	log.Println(rowCount)
 
 	cols, values, scanArgs, err := ColumnTypes(db, tableName)
 	if err != nil {
@@ -192,7 +191,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		tableName = tableNames[0]
 	} else {
 		if contains(tableNames, requestedTable) {
-			println(tableName)
 			tableName = requestedTable
 		} else {
 			log.Printf("Table %s does not exist", tableName)
@@ -200,14 +198,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	}
 
-	log.Println("wanted %s, got %s", requestedTable, tableName)
-
 	w.Header().Set("Content-Disposition", "attachment; filename="+tableName+".xlsx")
 	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 	w.WriteHeader(http.StatusOK)
-	outputfile, err := os.Create("test.xlsx")
 	err = WriteXLSX(db, w, tableName)
-	err = WriteXLSX(db, outputfile, tableName)
 	if err != nil {
 		log.Fatalf("%v", err)
 	}
