@@ -173,7 +173,7 @@ func contains(s []string, e string) bool {
 func Handler(w http.ResponseWriter, r *http.Request) {
 	requestedTable := r.URL.Path[strings.LastIndex(r.URL.Path, "/")+1:]
 
-	db, err := sql.Open("sqlite3", "../scraperwiki.sqlite")
+	db, err := sql.Open("sqlite3", "../../scraperwiki.sqlite")
 	if err != nil {
 		log.Fatal("db, err :=", db, err)
 	}
