@@ -171,8 +171,7 @@ func contains(s []string, e string) bool {
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	requestedTable := r.URL.Path
-	log.Println(requestedTable[strings.LastIndex(requestedTable, "/"):])
+	requestedTable := r.URL.Path[strings.LastIndex(r.URL.Path, "/")+1:]
 
 	db, err := sql.Open("sqlite3", "../scraperwiki.sqlite")
 	if err != nil {
@@ -184,8 +183,13 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("%s\n", err)
 	}
 
-	_ = tableNames
-	tableName := requestedTable
+	var tableName string
+	if requestedTable == "alltables" {
+		// TODO: Create XLSX with a sheet for each table
+		tableName = tableNames[0]
+	} else {
+		tableName = requestedTable
+	}
 
 	w.Header().Set("Content-Disposition", "attachment; filename="+tableName)
 	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
