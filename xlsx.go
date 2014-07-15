@@ -207,5 +207,8 @@ func main() {
 	defer f.Close()
 	log.SetOutput(f)
 
-	cgi.Serve(http.HandlerFunc(Handler))
+	err = cgi.Serve(http.HandlerFunc(Handler))
+	if err != nil {
+		log.Fatalf("error opening file: %v", err)
+	}
 }
