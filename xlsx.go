@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/http/cgi"
 	"os"
-	"regexp"
 	"strconv"
 	"time"
 
@@ -27,13 +26,12 @@ func TableNames(db *sql.DB) ([]string, error) {
 
 	for rows.Next() {
 		var tableName string
-		if err := rows.Scan(&name); err != nil {
+		if err := rows.Scan(&tableName); err != nil {
 			return nil, err
 		}
-		append(tableNames, tableName)
+		tableNames = append(tableNames, tableName)
 	}
 
-	err := row.Scan(&tableName)
 	return tableNames, err
 }
 
@@ -172,8 +170,7 @@ func contains(s []string, e string) bool {
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	re := regexp.MustCompile(`xlsx\/[^\/]+$`)
-	requestedTable = re.FindString(r.url)[4:]
+	requestedTable := r.URL.Path
 	log.Println(requestedTable)
 
 	db, err := sql.Open("sqlite3", "../scraperwiki.sqlite")
@@ -186,6 +183,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("%s\n", err)
 	}
 
+	_ = tableNames
+	tableName := requestedTable
+
 	w.Header().Set("Content-Disposition", "attachment; filename="+tableName)
 	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 	w.WriteHeader(http.StatusOK)
@@ -193,12 +193,14 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	f, err := os.OpenFile("testlogfile", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	f, err := os.OpenFile("logfile", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatalf("error opening file: %v", err)
 	}
 	defer f.Close()
 	log.SetOutput(f)
+
+	log.Println("test")
 
 	cgi.Serve(http.HandlerFunc(Handler))
 }
