@@ -100,7 +100,7 @@ func PopulateRow(r xlsx.Row, values []interface{}) error {
 		default:
 			r.Cells[i] = xlsx.Cell{
 				Type:  xlsx.CellTypeInlineString,
-				Value: fmt.Sprintf("%v", v),
+				Value: fmt.Sprintf("%s", v),
 			}
 
 		}
