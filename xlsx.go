@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/http/cgi"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -83,26 +82,22 @@ func PopulateRow(r xlsx.Row, values []interface{}) error {
 				Type:  xlsx.CellTypeInlineString,
 				Value: "",
 			}
-		case uint64:
-			r.Cells[i] = xlsx.Cell{
-				Type:  xlsx.CellTypeNumber,
-				Value: strconv.FormatUint(v, 10),
-			}
-		case int64:
-			r.Cells[i] = xlsx.Cell{
-				Type:  xlsx.CellTypeNumber,
-				Value: strconv.FormatInt(v, 10),
-			}
 		case time.Time:
 			r.Cells[i] = xlsx.Cell{
 				Type:  xlsx.CellTypeDatetime,
 				Value: v.Format(time.RFC3339),
 			}
-		default:
+		case string:
 			r.Cells[i] = xlsx.Cell{
 				Type:  xlsx.CellTypeInlineString,
 				Value: fmt.Sprintf("%s", v),
 			}
+		default:
+			r.Cells[i] = xlsx.Cell{
+				Type:  xlsx.CellTypeNumber,
+				Value: fmt.Sprintf("%v", v),
+			}
+
 		}
 	}
 	return nil
