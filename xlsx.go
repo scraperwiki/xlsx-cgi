@@ -97,6 +97,11 @@ func PopulateRow(r xlsx.Row, values []interface{}) error {
 				Type:  xlsx.CellTypeNumber,
 				Value: fmt.Sprintf("%v", v),
 			}
+		default:
+			r.Cells[i] = xlsx.Cell{
+				Type:  xlsx.CellTypeInlineString,
+				Value: fmt.Sprintf("%v", v),
+			}
 
 		}
 	}
