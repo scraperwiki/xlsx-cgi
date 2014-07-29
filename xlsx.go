@@ -189,7 +189,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	tableNames, err := TableNames(db)
 	if err != nil {
-		fmt.Fatalf("%s\n", err)
+		log.Fatalf("%s\n", err)
 	}
 
 	var tableName string
