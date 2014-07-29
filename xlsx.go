@@ -180,10 +180,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	tableNames, err := TableNames(db)
 	if err != nil {
-		fmt.Printf("%s\n", err)
+		fmt.Fatalf("%s\n", err)
 	}
-
-	log.Printf("%s", tableNames)
 
 	var tableName string
 	if requestedTable == "alltables" {
@@ -193,7 +191,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		if contains(tableNames, requestedTable) {
 			tableName = requestedTable
 		} else {
-			log.Printf("Table %s does not exist", tableName)
+			log.Fatalf("Table %s does not exist", tableName)
 		}
 
 	}
