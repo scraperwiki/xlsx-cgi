@@ -37,14 +37,14 @@ func TableNames(db *sql.DB) ([]string, error) {
 }
 
 func RowCount(db *sql.DB, tablename string) (int, error) {
-	row := db.QueryRow("SELECT COUNT(*) FROM " + tablename)
+	row := db.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM [%s]", tablename))
 	var rowCount int
 	err := row.Scan(&rowCount)
 	return rowCount, err
 }
 
 func ColumnTypes(db *sql.DB, tablename string) ([]xlsx.Column, []interface{}, []interface{}, error) {
-	rows, err := db.Query(fmt.Sprintf("SELECT * FROM %s limit 1", tablename))
+	rows, err := db.Query(fmt.Sprintf("SELECT * FROM [%s] limit 1", tablename))
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -126,7 +126,7 @@ func WriteXLSX(db *sql.DB, w io.Writer, tableName string) error {
 	sh.Title = tableName
 	sw, err := ww.NewSheetWriter(&sh)
 
-	rows, err := db.Query("SELECT * FROM " + tableName)
+	rows, err := db.Query(fmt.Sprintf("SELECT * FROM [%s]", tableName))
 	if err != nil {
 		log.Fatal(err)
 	}
