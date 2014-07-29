@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/cgi"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -172,6 +173,14 @@ func contains(s []string, e string) bool {
 
 func Handler(w http.ResponseWriter, r *http.Request) {
 	requestedTable := r.URL.Path[strings.LastIndex(r.URL.Path, "/")+1:]
+
+	isMatch, err := regexp.MatchString("^[0-9a-z_]+$", requestedTable)
+	if err != nil {
+		log.Fatalf("%s\n", err)
+	}
+	if !isMatch {
+		log.Fatalf("Invalid table name: %s", requestedTable)
+	}
 
 	db, err := sql.Open("sqlite3", "/home/scraperwiki.sqlite")
 	if err != nil {
