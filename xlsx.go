@@ -192,26 +192,28 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		log.Fatalf("%s\n", err)
 	}
 
-	var tableName string
+	var tablesToWrite []string
 	if requestedTable == "alltables" {
-		// TODO: Create XLSX with a sheet for each table
-		tableName = tableNames[0]
+		tablesToWrite = tableNames
 	} else {
 		if contains(tableNames, requestedTable) {
-			tableName = requestedTable
+			tablesToWrite = append(tablesToWrite, requestedTable)
 		} else {
-			log.Fatalf("Table %s does not exist", tableName)
+			log.Fatalf("Table %s does not exist", requestedTable)
 		}
-
 	}
 
-	w.Header().Set("Content-Disposition", "attachment; filename="+tableName+".xlsx")
+	w.Header().Set("Content-Disposition", "attachment; filename="+requestedTable+".xlsx")
 	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 	w.WriteHeader(http.StatusOK)
-	err = WriteXLSX(db, w, tableName)
-	if err != nil {
-		log.Fatalf("%v", err)
+
+	for _, tableName := range tablesToWrite {
+		err = WriteXLSX(db, w, tableName)
+		if err != nil {
+			log.Fatalf("%v", err)
+		}
 	}
+
 }
 
 func main() {
