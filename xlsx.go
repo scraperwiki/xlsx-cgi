@@ -112,12 +112,12 @@ func PopulateRow(r xlsx.Row, values []interface{}) error {
 func WriteSheet(ww *xlsx.WorkbookWriter, db *sql.DB, w io.Writer, tableName string) error {
 	rowCount, err := RowCount(db, tableName)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	cols, values, scanArgs, err := ColumnTypes(db, tableName)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	sh := xlsx.NewSheetWithColumns(cols)
@@ -133,24 +133,24 @@ func WriteSheet(ww *xlsx.WorkbookWriter, db *sql.DB, w io.Writer, tableName stri
 		rows.Next()
 		err = rows.Scan(scanArgs...)
 		if err != nil {
-			panic(err)
+			log.Fatal(err)
 		}
 
 		r := sh.NewRow()
 		err = PopulateRow(r, values)
 		if err != nil {
-			panic(err)
+			log.Fatal(err)
 		}
 
 		err = sw.WriteRows([]xlsx.Row{r})
 		if err != nil {
-			panic(err)
+			log.Fatal(err)
 		}
 	}
 
 	err = rows.Close()
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	return err
