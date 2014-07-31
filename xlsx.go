@@ -204,12 +204,11 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	ww := xlsx.NewWorkbookWriter(w)
 	for _, tableName := range tablesToWrite {
 		err = WriteSheet(ww, db, w, tableName)
-
-		err = ww.Close()
 		if err != nil {
 			log.Fatalf("%v", err)
 		}
 	}
+	err = ww.Close()
 
 }
 
