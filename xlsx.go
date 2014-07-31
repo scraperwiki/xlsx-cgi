@@ -109,7 +109,7 @@ func PopulateRow(r xlsx.Row, values []interface{}) error {
 	return nil
 }
 
-func WriteXLSX(db *sql.DB, w io.Writer, tableName string) error {
+func WriteSheet(ww *xlsx.WorkbookWriter, db *sql.DB, w io.Writer, tableName string) error {
 	rowCount, err := RowCount(db, tableName)
 	if err != nil {
 		panic(err)
@@ -119,8 +119,6 @@ func WriteXLSX(db *sql.DB, w io.Writer, tableName string) error {
 	if err != nil {
 		panic(err)
 	}
-
-	ww := xlsx.NewWorkbookWriter(w)
 
 	sh := xlsx.NewSheetWithColumns(cols)
 	sh.Title = tableName
@@ -155,10 +153,6 @@ func WriteXLSX(db *sql.DB, w io.Writer, tableName string) error {
 		panic(err)
 	}
 
-	err = ww.Close()
-	if err != nil {
-		panic(err)
-	}
 	return err
 }
 
@@ -207,8 +201,15 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 	w.WriteHeader(http.StatusOK)
 
+	ww := xlsx.NewWorkbookWriter(w)
 	for _, tableName := range tablesToWrite {
-		err = WriteXLSX(db, w, tableName)
+		err = WriteSheet(ww, db, w, tableName)
+
+		err = ww.Close()
+		if err != nil {
+			panic(err)
+		}
+
 		if err != nil {
 			log.Fatalf("%v", err)
 		}
