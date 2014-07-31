@@ -207,10 +207,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 		err = ww.Close()
 		if err != nil {
-			panic(err)
-		}
-
-		if err != nil {
 			log.Fatalf("%v", err)
 		}
 	}
