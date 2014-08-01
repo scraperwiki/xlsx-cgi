@@ -111,48 +111,48 @@ func PopulateRow(r xlsx.Row, values []interface{}) error {
 func WriteSheet(ww *xlsx.WorkbookWriter, db *sql.DB, tableName string) error {
 	rowCount, err := RowCount(db, tableName)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	cols, values, scanArgs, err := ColumnTypes(db, tableName)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	sh := xlsx.NewSheetWithColumns(cols)
 	sh.Title = tableName
 	sw, err := ww.NewSheetWriter(&sh)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	rows, err := db.Query(fmt.Sprintf("SELECT * FROM [%s]", tableName))
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	for i := 0; i < rowCount; i++ {
 		rows.Next()
 		err = rows.Scan(scanArgs...)
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 
 		r := sh.NewRow()
 		err = PopulateRow(r, values)
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 
 		err = sw.WriteRows([]xlsx.Row{r})
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 	}
 
 	err = rows.Close()
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	return err
@@ -172,20 +172,20 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	isMatch, err := regexp.MatchString("^[0-9a-z_]+$", requestedTable)
 	if err != nil {
-		log.Fatalf("%s\n", err)
+		panic(err)
 	}
 	if !isMatch {
-		log.Fatalf("Invalid table name: %s", requestedTable)
+		panic(fmt.Sprintf("Invalid table name: %s", requestedTable))
 	}
 
 	db, err := sql.Open("sqlite3", "/home/scraperwiki.sqlite")
 	if err != nil {
-		log.Fatal("db, err :=", db, err)
+		panic(err)
 	}
 
 	tableNames, err := TableNames(db)
 	if err != nil {
-		log.Fatalf("%s\n", err)
+		panic(err)
 	}
 
 	var tablesToWrite []string
@@ -195,7 +195,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		if contains(tableNames, requestedTable) {
 			tablesToWrite = append(tablesToWrite, requestedTable)
 		} else {
-			log.Fatalf("Table %s does not exist", requestedTable)
+			panic(fmt.Sprintf("Table %s does not exist", requestedTable))
 		}
 	}
 
@@ -208,7 +208,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		os.Stderr.WriteString(fmt.Sprintf("%s\n", tableName))
 		err = WriteSheet(ww, db, tableName)
 		if err != nil {
-			log.Fatalf("%v", err)
+			panic(err)
 		}
 	}
 	err = ww.Close()
