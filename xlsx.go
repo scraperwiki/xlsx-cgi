@@ -15,6 +15,10 @@ import (
 	"github.com/psmithuk/xlsx"
 )
 
+var (
+	tableNameCheck = regexp.MustCompile("^[0-9a-z_]+$")
+)
+
 func TableNames(db *sql.DB) ([]string, error) {
 	rows, err := db.Query("SELECT name FROM sqlite_master")
 	if err != nil {
@@ -170,11 +174,7 @@ func contains(s []string, e string) bool {
 func Handler(w http.ResponseWriter, r *http.Request) {
 	requestedTable := r.URL.Path[strings.LastIndex(r.URL.Path, "/")+1:]
 
-	isMatch, err := regexp.MatchString("^[0-9a-z_]+$", requestedTable)
-	if err != nil {
-		panic(err)
-	}
-	if !isMatch {
+	if !tableNameCheck.MatchString(requestedTable) {
 		panic(fmt.Sprintf("Invalid table name: %s", requestedTable))
 	}
 
