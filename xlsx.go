@@ -8,7 +8,6 @@ import (
 	"net/http/cgi"
 	"os"
 	"regexp"
-	"strings"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -16,7 +15,8 @@ import (
 )
 
 var (
-	tableNameCheck = regexp.MustCompile("^[0-9a-z_]+$")
+	tableNameCheck = regexp.MustCompile(`^[0-9a-z_]+$`)
+	pathParse      = regexp.MustCompile(`\/[a-z0-9]+\/[a-z0-9]+\/cgi-bin\/xlsx\/?([0-9a-z_]*)\/?`)
 )
 
 func TableNames(db *sql.DB) ([]string, error) {
@@ -172,9 +172,9 @@ func contains(s []string, e string) bool {
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	requestedTable := r.URL.Path[strings.LastIndex(r.URL.Path, "/")+1:]
+	requestedTable := pathParse.ReplaceAllString(r.URL.Path, "$1")
 
-	if !tableNameCheck.MatchString(requestedTable) {
+	if !tableNameCheck.MatchString(requestedTable) && requestedTable != "" {
 		panic(fmt.Sprintf("Invalid table name: %s", requestedTable))
 	}
 
@@ -189,8 +189,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var tablesToWrite []string
-	if requestedTable == "alltables" {
+	if requestedTable == "" {
 		tablesToWrite = tableNames
+		requestedTable = "all_tables"
 	} else {
 		if contains(tableNames, requestedTable) {
 			tablesToWrite = append(tablesToWrite, requestedTable)
@@ -205,7 +206,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	ww := xlsx.NewWorkbookWriter(w)
 	for _, tableName := range tablesToWrite {
-		os.Stderr.WriteString(fmt.Sprintf("%s\n", tableName))
 		err = WriteSheet(ww, db, tableName)
 		if err != nil {
 			panic(err)
