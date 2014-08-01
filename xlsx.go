@@ -123,6 +123,9 @@ func WriteSheet(ww *xlsx.WorkbookWriter, db *sql.DB, w io.Writer, tableName stri
 	sh := xlsx.NewSheetWithColumns(cols)
 	sh.Title = tableName
 	sw, err := ww.NewSheetWriter(&sh)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	rows, err := db.Query(fmt.Sprintf("SELECT * FROM [%s]", tableName))
 	if err != nil {
