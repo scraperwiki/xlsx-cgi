@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"net/http/cgi"
@@ -109,7 +108,7 @@ func PopulateRow(r xlsx.Row, values []interface{}) error {
 	return nil
 }
 
-func WriteSheet(ww *xlsx.WorkbookWriter, db *sql.DB, w io.Writer, tableName string) error {
+func WriteSheet(ww *xlsx.WorkbookWriter, db *sql.DB, tableName string) error {
 	rowCount, err := RowCount(db, tableName)
 	if err != nil {
 		log.Fatal(err)
@@ -206,7 +205,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	ww := xlsx.NewWorkbookWriter(w)
 	for _, tableName := range tablesToWrite {
-		err = WriteSheet(ww, db, w, tableName)
+		os.Stderr.WriteString(fmt.Sprintf("%s\n", tableName))
+		err = WriteSheet(ww, db, tableName)
 		if err != nil {
 			log.Fatalf("%v", err)
 		}
