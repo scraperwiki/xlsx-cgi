@@ -189,14 +189,34 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var tablesToWrite []string
-	if requestedTable == "" {
-		tablesToWrite = tableNames
-		requestedTable = "all_tables"
+	var gridsToWrite []string
+
+	if contains(tableNames, "_grids") {
+		// TODO: handle all grids at once case
+		pageNum, err := strconv.Atoi(pathParse.ReplaceAllString(r.URL.Path, "$1"))
+		if err != nil {
+			panic(err)
+		}
+
+		gridURL, err := GridURL(db, pageNum)
+		switch {
+		case err == sql.ErrNoRows:
+			panic(fmt.Sprintf("Page %v does not exist", pageNum))
+		case err != nil:
+			panic(err)
+		default:
+			gridsToWrite = append(gridsToWrite, gridURL)
+		}
 	} else {
-		if contains(tableNames, requestedTable) {
-			tablesToWrite = append(tablesToWrite, requestedTable)
+		if requestedTable == "" {
+			tablesToWrite = tableNames
+			requestedTable = "all_tables"
 		} else {
-			panic(fmt.Sprintf("Table %s does not exist", requestedTable))
+			if contains(tableNames, requestedTable) {
+				tablesToWrite = append(tablesToWrite, requestedTable)
+			} else {
+				panic(fmt.Sprintf("Table %s does not exist", requestedTable))
+			}
 		}
 	}
 
@@ -205,12 +225,21 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 	ww := xlsx.NewWorkbookWriter(w)
+
 	for _, tableName := range tablesToWrite {
 		err = WriteSheet(ww, db, tableName)
 		if err != nil {
 			panic(err)
 		}
 	}
+
+	for _, gridURL := range gridsToWrite {
+		err = WriteGridSheet(ww, db, gridURL)
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	err = ww.Close()
 
 }
