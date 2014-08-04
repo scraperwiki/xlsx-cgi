@@ -123,7 +123,12 @@ func PopulateRow(r xlsx.Row, values []interface{}) error {
 	return nil
 }
 
-func WriteGridSheet(ww *xlsx.WorkbookWriter, db *sql.DB, gridURL string) {
+func WriteGridSheet(ww *xlsx.WorkbookWriter, db *sql.DB, gridURL string) error {
+	ParseHTML(gridURL)
+	return nil
+}
+
+func ParseHTML(gridURL string) {
 	gridPath := gridPathParse.ReplaceAllString(gridURL, "$1")
 
 	f, err := os.Open(os.ExpandEnv("$HOME" + gridPath))
@@ -143,7 +148,6 @@ func WriteGridSheet(ww *xlsx.WorkbookWriter, db *sql.DB, gridURL string) {
 			}
 		}
 	}
-
 }
 
 type HTMLTable struct {
