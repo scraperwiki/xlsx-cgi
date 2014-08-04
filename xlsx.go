@@ -16,8 +16,17 @@ import (
 
 var (
 	tableNameCheck = regexp.MustCompile(`^[0-9a-z_]+$`)
+	pageNumParse   = regexp.MustCompile(`\/[a-z0-9]+\/[a-z0-9]+\/cgi-bin\/xlsx\/page_([0-9]+)`)
 	pathParse      = regexp.MustCompile(`\/[a-z0-9]+\/[a-z0-9]+\/cgi-bin\/xlsx\/?([0-9a-z_]*)\/?`)
+	gridPathParse  = regexp.MustCompile(`.*(\/http\/grids\/[a-z0-9]+\.html)`)
 )
+
+func GridURL(db *sql.DB, pageNum int) (string, error) {
+	row := db.QueryRow("SELECT url FROM _grids where number=?", pageNum)
+	var gridURL string
+	err := row.Scan(&gridURL)
+	return gridURL, err
+}
 
 func TableNames(db *sql.DB) ([]string, error) {
 	rows, err := db.Query("SELECT name FROM sqlite_master")
@@ -193,7 +202,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	if contains(tableNames, "_grids") {
 		// TODO: handle all grids at once case
-		pageNum, err := strconv.Atoi(pathParse.ReplaceAllString(r.URL.Path, "$1"))
+		pageNum, err := strconv.Atoi(pageNumParse.ReplaceAllString(r.URL.Path, "$1"))
 		if err != nil {
 			panic(err)
 		}
