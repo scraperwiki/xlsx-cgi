@@ -178,7 +178,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		panic(fmt.Sprintf("Invalid table name: %s", requestedTable))
 	}
 
-	db, err := sql.Open("sqlite3", "/home/scraperwiki.sqlite")
+	db, err := sql.Open("sqlite3", os.ExpandEnv("$HOME/scraperwiki.sqlite"))
 	if err != nil {
 		panic(err)
 	}
