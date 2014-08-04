@@ -8,8 +8,10 @@ import (
 	"net/http/cgi"
 	"os"
 	"regexp"
+	"strconv"
 	"time"
 
+	"code.google.com/p/go.net/html"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/psmithuk/xlsx"
 )
@@ -119,6 +121,100 @@ func PopulateRow(r xlsx.Row, values []interface{}) error {
 		}
 	}
 	return nil
+}
+
+func WriteGridSheet(ww *xlsx.WorkbookWriter, db *sql.DB, gridURL string) {
+	gridPath := gridPathParse.ReplaceAllString(gridURL, "$1")
+
+	f, err := os.Open(os.ExpandEnv("$HOME" + gridPath))
+	if err != nil {
+		panic(err)
+	}
+
+	z := html.NewTokenizer(f)
+	tables := make(chan HTMLTable)
+	for {
+		switch z.Next() {
+		case html.ErrorToken:
+			return
+		case html.StartTagToken:
+			if z.Token().Data == "tbody" {
+				ParseHTMLTable(z, tables)
+			}
+		}
+	}
+
+}
+
+type HTMLTable struct {
+	ColNum int
+	Rows   chan HTMLRow
+}
+
+type HTMLRow []string
+
+func ParseHTMLTable(z *html.Tokenizer, tables chan HTMLTable) error {
+	firstRow := true
+	var currentTable HTMLTable
+
+	for {
+		switch z.Next() {
+		case html.StartTagToken:
+			t := z.Token()
+			if t.Data == "tr" {
+				if firstRow {
+					z.Next()
+					z.Next()
+					colNum, err := strconv.Atoi(z.Token().Attr[0].Val)
+					if err != nil {
+						return err
+					}
+
+					currentTable = HTMLTable{colNum, make(chan HTMLRow)}
+
+					firstRow = false
+				} else {
+					ParseHTMLRow(z, currentTable)
+				}
+			}
+		case html.EndTagToken:
+			if z.Token().Data == "tbody" {
+				tables <- currentTable
+				return nil
+			}
+		}
+	}
+}
+
+func ParseHTMLRow(z *html.Tokenizer, table HTMLTable) error {
+	var currentRow HTMLRow
+	for {
+		switch z.Next() {
+		case html.StartTagToken:
+			if z.Token().Data == "td" {
+				ParseHTMLCell(z, currentRow)
+			}
+		case html.EndTagToken:
+			fmt.Print("\n")
+			if z.Token().Data == "tr" {
+				table.Rows <- currentRow
+				return nil
+			}
+		}
+	}
+}
+
+func ParseHTMLCell(z *html.Tokenizer, currentRow HTMLRow) error {
+	for {
+		switch z.Next() {
+		case html.TextToken:
+			currentRow = append(currentRow, z.Token().Data)
+		case html.EndTagToken:
+			if z.Token().Data == "td" {
+				return nil
+			}
+		}
+	}
 }
 
 func WriteSheet(ww *xlsx.WorkbookWriter, db *sql.DB, tableName string) error {
