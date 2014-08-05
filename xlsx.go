@@ -229,8 +229,11 @@ findFirstTr:
 		case html.ErrorToken:
 			return
 		case html.StartTagToken:
-			if z.Token().Data == "tr" {
-				ParseHTMLRow(z, rows)
+			t := z.Token()
+			if t.Data == "tr" {
+				if !IsMetaRow(t.Attr) {
+					ParseHTMLRow(z, rows)
+				}
 			}
 		case html.EndTagToken:
 			if z.Token().Data == "tbody" {
@@ -302,6 +305,15 @@ func GetSpans(attributes []html.Attribute) (rowspan, colspan uint64, err error) 
 		}
 	}
 	return rowspan, colspan, nil
+}
+
+func IsMetaRow(attributes []html.Attribute) bool {
+	for _, attribute := range attributes {
+		if attribute.Key == "class" && attribute.Val == "meta_row" {
+			return true
+		}
+	}
+	return false
 }
 
 func WriteSheet(ww *xlsx.WorkbookWriter, db *sql.DB, tableName string) error {
@@ -380,8 +392,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 
-	var tablesToWrite []string
-	var gridsToWrite []string
+	var tablesToWrite, gridsToWrite []string
 
 	if contains(tableNames, "_grids") {
 		// TODO: handle all grids at once case
