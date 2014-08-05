@@ -168,12 +168,14 @@ func WriteGridSheet(ww *xlsx.WorkbookWriter, table HTMLTable) error {
 
 	for htmlRow := range table.Rows {
 		sheetRow := sh.NewRow()
-		for i, htmlCell := range htmlRow {
+		var i uint64
+		for _, htmlCell := range htmlRow {
 			sheetRow.Cells[i] = xlsx.Cell{
 				Type:    xlsx.CellTypeInlineString,
 				Value:   htmlCell.Text,
 				Colspan: htmlCell.Colspan,
 			}
+			i += htmlCell.Colspan
 		}
 		err = sw.WriteRows([]xlsx.Row{sheetRow})
 		if err != nil {
