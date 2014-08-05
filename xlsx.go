@@ -123,43 +123,40 @@ func PopulateRow(r xlsx.Row, values []interface{}) error {
 	return nil
 }
 
-func WriteGridSheet(ww *xlsx.WorkbookWriter, tables <-chan HTMLTable) error {
-	for table := range tables {
-		c := []xlsx.Column{}
+func WriteGridSheet(ww *xlsx.WorkbookWriter, table HTMLTable) error {
+	c := []xlsx.Column{}
 
-		for i := uint64(0); i < table.ColNum; i++ {
-			c = append(c, xlsx.Column{
-				Name:  fmt.Sprintf("Col%v", i),
-				Width: 10,
-			})
+	for i := uint64(0); i < table.ColNum; i++ {
+		c = append(c, xlsx.Column{
+			Name:  fmt.Sprintf("Col%v", i),
+			Width: 10,
+		})
+	}
+
+	sh := xlsx.NewSheetWithColumns(c)
+	sw, err := ww.NewSheetWriter(&sh)
+	if err != nil {
+		panic(err)
+	}
+
+	for htmlRow := range table.Rows {
+		sheetRow := sh.NewRow()
+		for i, htmlCell := range htmlRow {
+			sheetRow.Cells[i] = xlsx.Cell{
+				Type:    xlsx.CellTypeInlineString,
+				Value:   htmlCell.Text,
+				Colspan: htmlCell.Colspan,
+			}
 		}
-
-		sh := xlsx.NewSheetWithColumns(c)
-		sw, err := ww.NewSheetWriter(&sh)
+		err = sw.WriteRows([]xlsx.Row{sheetRow})
 		if err != nil {
-			panic(err)
-		}
-
-		for htmlRow := range table.Rows {
-			sheetRow := sh.NewRow()
-			for i, htmlCell := range htmlRow {
-				sheetRow.Cells[i] = xlsx.Cell{
-					Type:    xlsx.CellTypeInlineString,
-					Value:   htmlCell.Text,
-					Colspan: htmlCell.Colspan,
-				}
-			}
-			err = sw.WriteRows([]xlsx.Row{sheetRow})
-			if err != nil {
-				return err
-			}
+			return err
 		}
 	}
 	return nil
 }
 
 func ParseHTML(gridURL string, tables chan<- HTMLTable) {
-	defer close(tables)
 	gridPath := gridPathParse.ReplaceAllString(gridURL, "$1")
 
 	f, err := os.Open(os.ExpandEnv("$HOME" + gridPath))
@@ -441,10 +438,15 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	for _, gridURL := range gridsToWrite {
-		tables := make(chan HTMLTable)
-		go ParseHTML(gridURL, tables)
-		err = WriteGridSheet(ww, tables)
+	tables := make(chan HTMLTable)
+	go func() {
+		defer close(tables)
+		for _, gridURL := range gridsToWrite {
+			ParseHTML(gridURL, tables)
+		}
+	}()
+	for table := range tables {
+		err = WriteGridSheet(ww, table)
 		if err != nil {
 			panic(err)
 		}
