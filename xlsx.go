@@ -334,6 +334,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 	ww := xlsx.NewWorkbookWriter(w)
+	defer ww.Close()
 
 	for _, tableName := range tablesToWrite {
 		err = WriteSheet(ww, db, tableName)
