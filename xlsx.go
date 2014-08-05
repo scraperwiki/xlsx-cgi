@@ -9,6 +9,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"code.google.com/p/go.net/html"
@@ -22,6 +23,24 @@ var (
 	pathParse      = regexp.MustCompile(`\/[a-z0-9]+\/[a-z0-9]+\/cgi-bin\/xlsx\/?([0-9a-z_]*)\/?`)
 	gridPathParse  = regexp.MustCompile(`.*(\/http\/grids\/[a-z0-9_]+\.html)`)
 )
+
+func AllGrids(db *sql.DB) ([]struct{ URL, Title string }, error) {
+	gridsToWrite := []struct{ URL, Title string }{}
+	rows, err := db.Query("SELECT url, title from _GRIDS where number>0")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var gridURL, gridTitle string
+		err = rows.Scan(&gridURL, &gridTitle)
+		if err != nil {
+			return nil, err
+		}
+		gridsToWrite = append(gridsToWrite, struct{ URL, Title string }{gridURL, gridTitle})
+	}
+	return gridsToWrite, nil
+}
 
 func GridURL(db *sql.DB, pageNum int) (string, error) {
 	row := db.QueryRow("SELECT url FROM _grids where number=?", pageNum)
@@ -403,33 +422,38 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var tablesToWrite []string
-	gridsToWrite := map[string]string{}
+	gridsToWrite := []struct{ URL, Title string }{}
 
-	if contains(tableNames, "_grids") {
-		// TODO: handle all grids at once case
-		pageNum, err := strconv.Atoi(pageNumParse.ReplaceAllString(r.URL.Path, "$1"))
+	if requestedTable == "" {
+		requestedTable = "all_tables"
+		tablesToWrite = tableNames
+		gridsToWrite, err = AllGrids(db)
 		if err != nil {
 			panic(err)
 		}
-
-		gridURL, err := GridURL(db, pageNum)
-		switch {
-		case err == sql.ErrNoRows:
-			panic(fmt.Sprintf("Page %v does not exist", pageNum))
-		case err != nil:
-			panic(err)
-		default:
-			gridTitle, err := GridTitle(db, pageNum)
+	} else {
+		if contains(tableNames, "_grids") {
+			// TODO: handle all grids at once case
+			pageNum, err := strconv.Atoi(pageNumParse.ReplaceAllString(r.URL.Path, "$1"))
 			if err != nil {
 				panic(err)
 			}
-			gridsToWrite[gridTitle] = gridURL
-		}
-	} else {
-		if requestedTable == "" {
-			tablesToWrite = tableNames
-			requestedTable = "all_tables"
+
+			gridURL, err := GridURL(db, pageNum)
+			switch {
+			case err == sql.ErrNoRows:
+				panic(fmt.Sprintf("Page %v does not exist", pageNum))
+			case err != nil:
+				panic(err)
+			default:
+				gridTitle, err := GridTitle(db, pageNum)
+				if err != nil {
+					panic(err)
+				}
+				gridsToWrite = append(gridsToWrite, struct{ URL, Title string }{gridURL, gridTitle})
+			}
 		} else {
+
 			if contains(tableNames, requestedTable) {
 				tablesToWrite = append(tablesToWrite, requestedTable)
 			} else {
@@ -446,17 +470,20 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	defer ww.Close()
 
 	for _, tableName := range tablesToWrite {
-		err = WriteSheet(ww, db, tableName)
-		if err != nil {
-			panic(err)
+		// TODO: all tables option
+		if !strings.HasPrefix(tableName, "_") {
+			err = WriteSheet(ww, db, tableName)
+			if err != nil {
+				panic(err)
+			}
 		}
 	}
 
 	tables := make(chan HTMLTable)
 	go func() {
 		defer close(tables)
-		for gridTitle, gridURL := range gridsToWrite {
-			ParseHTML(gridURL, tables, gridTitle)
+		for _, grid := range gridsToWrite {
+			ParseHTML(grid.URL, tables, grid.Title)
 		}
 	}()
 	for table := range tables {
