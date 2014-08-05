@@ -123,12 +123,43 @@ func PopulateRow(r xlsx.Row, values []interface{}) error {
 	return nil
 }
 
-func WriteGridSheet(ww *xlsx.WorkbookWriter, db *sql.DB, gridURL string) error {
-	ParseHTML(gridURL)
+func WriteGridSheet(ww *xlsx.WorkbookWriter, tables <-chan HTMLTable) error {
+	for table := range tables {
+		c := []xlsx.Column{}
+
+		for i := uint64(0); i < table.ColNum; i++ {
+			c = append(c, xlsx.Column{
+				Name:  fmt.Sprintf("Col%v", i),
+				Width: 10,
+			})
+		}
+
+		sh := xlsx.NewSheetWithColumns(c)
+		sw, err := ww.NewSheetWriter(&sh)
+		if err != nil {
+			panic(err)
+		}
+
+		for htmlRow := range table.Rows {
+			sheetRow := sh.NewRow()
+			for i, htmlCell := range htmlRow {
+				sheetRow.Cells[i] = xlsx.Cell{
+					Type:    xlsx.CellTypeInlineString,
+					Value:   htmlCell.Text,
+					Colspan: htmlCell.Colspan,
+				}
+			}
+			err = sw.WriteRows([]xlsx.Row{sheetRow})
+			if err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
-func ParseHTML(gridURL string) {
+func ParseHTML(gridURL string, tables chan<- HTMLTable) {
+	defer close(tables)
 	gridPath := gridPathParse.ReplaceAllString(gridURL, "$1")
 
 	f, err := os.Open(os.ExpandEnv("$HOME" + gridPath))
@@ -137,13 +168,14 @@ func ParseHTML(gridURL string) {
 	}
 
 	z := html.NewTokenizer(f)
-	tables := make(chan HTMLTable)
+
 	for {
 		switch z.Next() {
 		case html.ErrorToken:
 			return
+
 		case html.StartTagToken:
-			if z.Token().Data == "tbody" {
+			if z.Token().Data == "table" {
 				ParseHTMLTable(z, tables)
 			}
 		}
@@ -151,74 +183,125 @@ func ParseHTML(gridURL string) {
 }
 
 type HTMLTable struct {
-	ColNum int
+	ColNum uint64
 	Rows   chan HTMLRow
 }
 
-type HTMLRow []string
+type HTMLRow []HTMLCell
 
-func ParseHTMLTable(z *html.Tokenizer, tables chan HTMLTable) error {
-	firstRow := true
-	var currentTable HTMLTable
+func (row HTMLRow) CountCols() uint64 {
+	var sum uint64
+	for _, cell := range row {
+		sum += cell.Colspan
+	}
+	return sum
+}
+
+type HTMLCell struct {
+	Text    string
+	Rowspan uint64
+	Colspan uint64
+}
+
+func ParseHTMLTable(z *html.Tokenizer, tables chan<- HTMLTable) {
+	rows := make(chan HTMLRow, 1)
+	defer close(rows)
+
+	// Discover the first row to retrieve colnum
+findFirstTr:
+	for {
+		switch z.Next() {
+		case html.ErrorToken:
+			return
+		case html.StartTagToken:
+			if z.Token().Data == "tr" {
+				ParseHTMLRow(z, rows)
+				row := <-rows
+				rows <- row
+				tables <- HTMLTable{row.CountCols(), rows}
+				break findFirstTr
+			}
+		}
+	}
 
 	for {
 		switch z.Next() {
+		case html.ErrorToken:
+			return
 		case html.StartTagToken:
-			t := z.Token()
-			if t.Data == "tr" {
-				if firstRow {
-					z.Next()
-					z.Next()
-					colNum, err := strconv.Atoi(z.Token().Attr[0].Val)
-					if err != nil {
-						return err
-					}
-
-					currentTable = HTMLTable{colNum, make(chan HTMLRow)}
-
-					firstRow = false
-				} else {
-					ParseHTMLRow(z, currentTable)
-				}
+			if z.Token().Data == "tr" {
+				ParseHTMLRow(z, rows)
 			}
 		case html.EndTagToken:
 			if z.Token().Data == "tbody" {
-				tables <- currentTable
-				return nil
+				return
 			}
 		}
 	}
 }
 
-func ParseHTMLRow(z *html.Tokenizer, table HTMLTable) error {
-	var currentRow HTMLRow
+func ParseHTMLRow(z *html.Tokenizer, rows chan<- HTMLRow) {
+	currentRow := HTMLRow{}
 	for {
 		switch z.Next() {
+		case html.ErrorToken:
+			return
 		case html.StartTagToken:
-			if z.Token().Data == "td" {
-				ParseHTMLCell(z, currentRow)
+			t := z.Token()
+			if t.Data == "td" {
+				ParseHTMLCell(z, &currentRow, t)
 			}
 		case html.EndTagToken:
-			fmt.Print("\n")
 			if z.Token().Data == "tr" {
-				table.Rows <- currentRow
-				return nil
+				rows <- currentRow
+				return
 			}
 		}
 	}
 }
 
-func ParseHTMLCell(z *html.Tokenizer, currentRow HTMLRow) error {
+func ParseHTMLCell(z *html.Tokenizer, currentRowPtr *HTMLRow, t html.Token) {
+	rowspan, colspan, err := GetSpans(t.Attr)
+	if err != nil {
+		panic(fmt.Sprintf("Non numeric span: %v", t.Attr))
+	}
+
+	currentCell := HTMLCell{"", rowspan, colspan}
 	for {
 		switch z.Next() {
+		case html.ErrorToken:
+			return
 		case html.TextToken:
-			currentRow = append(currentRow, z.Token().Data)
+			currentCell.Text = z.Token().Data
 		case html.EndTagToken:
 			if z.Token().Data == "td" {
-				return nil
+				currentRow := *currentRowPtr
+				*currentRowPtr = append(currentRow, currentCell)
+				return
 			}
 		}
 	}
+}
+
+func GetSpans(attributes []html.Attribute) (rowspan, colspan uint64, err error) {
+	rowspan = 1
+	colspan = 1
+	for _, attribute := range attributes {
+		if attribute.Key == "colspan" {
+			colspanInt, err := strconv.Atoi(attribute.Val)
+			if err != nil {
+				return 0, 0, err
+			}
+			colspan = uint64(colspanInt)
+		} else if attribute.Key == "rowspan" {
+			rowspanInt, err := strconv.Atoi(attribute.Val)
+			if err != nil {
+				return 0, 0, err
+			}
+			rowspan = uint64(rowspanInt)
+		}
+	}
+	return rowspan, colspan, nil
 }
 
 func WriteSheet(ww *xlsx.WorkbookWriter, db *sql.DB, tableName string) error {
@@ -344,14 +427,13 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, gridURL := range gridsToWrite {
-		err = WriteGridSheet(ww, db, gridURL)
+		tables := make(chan HTMLTable)
+		go ParseHTML(gridURL, tables)
+		err = WriteGridSheet(ww, tables)
 		if err != nil {
 			panic(err)
 		}
 	}
-
-	err = ww.Close()
-
 }
 
 func main() {
