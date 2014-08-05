@@ -38,7 +38,7 @@ func GridTitle(db *sql.DB, pageNum int) (string, error) {
 }
 
 func TableNames(db *sql.DB) ([]string, error) {
-	rows, err := db.Query("SELECT name FROM sqlite_master")
+	rows, err := db.Query("SELECT tbl_name FROM sqlite_master")
 	if err != nil {
 		return nil, err
 	}
