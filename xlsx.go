@@ -214,10 +214,13 @@ findFirstTr:
 		case html.ErrorToken:
 			return
 		case html.StartTagToken:
-			if z.Token().Data == "tr" {
+			t := z.Token()
+			if t.Data == "tr" {
 				ParseHTMLRow(z, rows)
 				row := <-rows
-				rows <- row
+				if !IsMetaRow(t.Attr) {
+					rows <- row
+				}
 				tables <- HTMLTable{row.CountCols(), rows}
 				break findFirstTr
 			}
@@ -307,6 +310,7 @@ func GetSpans(attributes []html.Attribute) (rowspan, colspan uint64, err error) 
 	return rowspan, colspan, nil
 }
 
+// Meta rows are not part of the grid data
 func IsMetaRow(attributes []html.Attribute) bool {
 	for _, attribute := range attributes {
 		if attribute.Key == "class" && attribute.Val == "meta_row" {
