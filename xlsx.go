@@ -30,6 +30,13 @@ func GridURL(db *sql.DB, pageNum int) (string, error) {
 	return gridURL, err
 }
 
+func GridTitle(db *sql.DB, pageNum int) (string, error) {
+	row := db.QueryRow("SELECT title FROM _grids where number=?", pageNum)
+	var title string
+	err := row.Scan(&title)
+	return title, err
+}
+
 func TableNames(db *sql.DB) ([]string, error) {
 	rows, err := db.Query("SELECT name FROM sqlite_master")
 	if err != nil {
@@ -134,6 +141,7 @@ func WriteGridSheet(ww *xlsx.WorkbookWriter, table HTMLTable) error {
 	}
 
 	sh := xlsx.NewSheetWithColumns(c)
+	sh.Title = table.Title
 	sw, err := ww.NewSheetWriter(&sh)
 	if err != nil {
 		panic(err)
@@ -156,7 +164,7 @@ func WriteGridSheet(ww *xlsx.WorkbookWriter, table HTMLTable) error {
 	return nil
 }
 
-func ParseHTML(gridURL string, tables chan<- HTMLTable) {
+func ParseHTML(gridURL string, tables chan<- HTMLTable, title string) {
 	gridPath := gridPathParse.ReplaceAllString(gridURL, "$1")
 
 	f, err := os.Open(os.ExpandEnv("$HOME" + gridPath))
@@ -173,7 +181,7 @@ func ParseHTML(gridURL string, tables chan<- HTMLTable) {
 
 		case html.StartTagToken:
 			if z.Token().Data == "table" {
-				ParseHTMLTable(z, tables)
+				ParseHTMLTable(z, tables, title)
 			}
 		}
 	}
@@ -182,6 +190,7 @@ func ParseHTML(gridURL string, tables chan<- HTMLTable) {
 type HTMLTable struct {
 	ColNum uint64
 	Rows   chan HTMLRow
+	Title  string
 }
 
 type HTMLRow []HTMLCell
@@ -200,7 +209,7 @@ type HTMLCell struct {
 	Colspan uint64
 }
 
-func ParseHTMLTable(z *html.Tokenizer, tables chan<- HTMLTable) {
+func ParseHTMLTable(z *html.Tokenizer, tables chan<- HTMLTable, title string) {
 	rows := make(chan HTMLRow, 1)
 	defer close(rows)
 
@@ -218,7 +227,7 @@ findFirstTr:
 				if !IsMetaRow(t.Attr) {
 					rows <- row
 				}
-				tables <- HTMLTable{row.CountCols(), rows}
+				tables <- HTMLTable{row.CountCols(), rows, title}
 				break findFirstTr
 			}
 		}
@@ -393,7 +402,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 
-	var tablesToWrite, gridsToWrite []string
+	var tablesToWrite []string
+	gridsToWrite := map[string]string{}
 
 	if contains(tableNames, "_grids") {
 		// TODO: handle all grids at once case
@@ -409,7 +419,11 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		case err != nil:
 			panic(err)
 		default:
-			gridsToWrite = append(gridsToWrite, gridURL)
+			gridTitle, err := GridTitle(db, pageNum)
+			if err != nil {
+				panic(err)
+			}
+			gridsToWrite[gridTitle] = gridURL
 		}
 	} else {
 		if requestedTable == "" {
@@ -441,8 +455,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	tables := make(chan HTMLTable)
 	go func() {
 		defer close(tables)
-		for _, gridURL := range gridsToWrite {
-			ParseHTML(gridURL, tables)
+		for gridTitle, gridURL := range gridsToWrite {
+			ParseHTML(gridURL, tables, gridTitle)
 		}
 	}()
 	for table := range tables {
