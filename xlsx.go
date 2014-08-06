@@ -23,7 +23,7 @@ var (
 )
 
 func TableNames(db *sql.DB) ([]string, error) {
-	rows, err := db.Query(`SELECT tbl_name FROM sqlite_master where type="table"`)
+	rows, err := db.Query(`SELECT tbl_name FROM sqlite_master WHERE type="table"`)
 	if err != nil {
 		return nil, err
 	}
