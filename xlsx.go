@@ -138,6 +138,16 @@ func WriteSheet(ww *xlsx.WorkbookWriter, db *sql.DB, tableName string) error {
 		return err
 	}
 
+	header := xlsx.Row{[]xlsx.Cell{}}
+	for _, col := range cols {
+		header.Cells = append(header.Cells, xlsx.Cell{
+			Type:  xlsx.CellTypeInlineString,
+			Value: col.Name,
+		})
+	}
+
+	sw.WriteRows([]xlsx.Row{header})
+
 	rows, err := db.Query(fmt.Sprintf("SELECT * FROM [%s]", tableName))
 	if err != nil {
 		return err
