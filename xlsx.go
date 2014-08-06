@@ -208,9 +208,11 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if requestedTable == "" {
 		requestedTable = "all_tables"
 		tablesToWrite = tableNames
-		gridsToWrite, err = AllGrids(db)
-		if err != nil {
-			panic(err)
+		if contains(tableNames, "_grids") {
+			gridsToWrite, err = AllGrids(db)
+			if err != nil {
+				panic(err)
+			}
 		}
 	} else {
 		if contains(tableNames, "_grids") && pageNumParse.MatchString(requestedTable) {
