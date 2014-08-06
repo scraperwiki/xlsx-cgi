@@ -20,7 +20,7 @@ import (
 var (
 	tableNameCheck = regexp.MustCompile(`^[0-9a-zA-Z_]+$`)
 	pageNumParse   = regexp.MustCompile(`page_([0-9]+)`)
-	pathParse      = regexp.MustCompile(`\/[a-z0-9]+\/[a-z0-9]+\/cgi-bin\/xlsx\/?([0-9a-zA-Z_]*)\/?`)
+	pathParse      = regexp.MustCompile(`\/[a-z0-9]+\/[a-z0-9]+\/cgi-bin\/xlsx(?:\/([0-9a-zA-Z_]+)\/?|\/?)$`)
 	gridPathParse  = regexp.MustCompile(`.*(\/http\/grids\/[a-z0-9_]+\.html)`)
 )
 
@@ -409,6 +409,12 @@ func contains(s []string, e string) bool {
 func Handler(w http.ResponseWriter, r *http.Request) {
 	requestedTable := pathParse.ReplaceAllString(r.URL.Path, "$1")
 
+	var devTables bool
+
+	if contains(r.URL.Query()["devTables"], "true") {
+		devTables = true
+	}
+
 	if !tableNameCheck.MatchString(requestedTable) && requestedTable != "" {
 		panic(fmt.Sprintf("Invalid table name: %s", requestedTable))
 	}
@@ -473,7 +479,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 	for _, tableName := range tablesToWrite {
 		// TODO: all tables option
-		if !strings.HasPrefix(tableName, "_") {
+		if !strings.HasPrefix(tableName, "_") || devTables {
 			err = WriteSheet(ww, db, tableName)
 			if err != nil {
 				panic(err)
