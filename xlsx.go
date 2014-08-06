@@ -18,9 +18,9 @@ import (
 )
 
 var (
-	tableNameCheck = regexp.MustCompile(`^[0-9a-z_]+$`)
+	tableNameCheck = regexp.MustCompile(`^[0-9a-zA-Z_]+$`)
 	pageNumParse   = regexp.MustCompile(`page_([0-9]+)`)
-	pathParse      = regexp.MustCompile(`\/[a-z0-9]+\/[a-z0-9]+\/cgi-bin\/xlsx\/?([0-9a-z_]*)\/?`)
+	pathParse      = regexp.MustCompile(`\/[a-z0-9]+\/[a-z0-9]+\/cgi-bin\/xlsx\/?([0-9a-zA-Z_]*)\/?`)
 	gridPathParse  = regexp.MustCompile(`.*(\/http\/grids\/[a-z0-9_]+\.html)`)
 )
 
