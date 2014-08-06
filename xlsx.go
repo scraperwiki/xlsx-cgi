@@ -19,7 +19,7 @@ import (
 
 var (
 	tableNameCheck = regexp.MustCompile(`^[0-9a-z_]+$`)
-	pageNumParse   = regexp.MustCompile(`\/[a-z0-9]+\/[a-z0-9]+\/cgi-bin\/xlsx\/page_([0-9]+)`)
+	pageNumParse   = regexp.MustCompile(`page_([0-9]+)`)
 	pathParse      = regexp.MustCompile(`\/[a-z0-9]+\/[a-z0-9]+\/cgi-bin\/xlsx\/?([0-9a-z_]*)\/?`)
 	gridPathParse  = regexp.MustCompile(`.*(\/http\/grids\/[a-z0-9_]+\.html)`)
 )
@@ -436,7 +436,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		if contains(tableNames, "_grids") {
 			// TODO: handle all grids at once case
-			pageNum, err := strconv.Atoi(pageNumParse.ReplaceAllString(r.URL.Path, "$1"))
+			pageNum, err := strconv.Atoi(pageNumParse.ReplaceAllString(requestedTable, "$1"))
 			if err != nil {
 				panic(err)
 			}
