@@ -23,7 +23,7 @@ var (
 )
 
 func TableNames(db *sql.DB) ([]string, error) {
-	rows, err := db.Query(`SELECT tbl_name FROM sqlite_master where type="table"`)
+	rows, err := db.Query(`SELECT tbl_name FROM sqlite_master WHERE type="table"`)
 	if err != nil {
 		return nil, err
 	}
@@ -138,6 +138,16 @@ func WriteSheet(ww *xlsx.WorkbookWriter, db *sql.DB, tableName string) error {
 		return err
 	}
 
+	header := xlsx.Row{[]xlsx.Cell{}}
+	for _, col := range cols {
+		header.Cells = append(header.Cells, xlsx.Cell{
+			Type:  xlsx.CellTypeInlineString,
+			Value: col.Name,
+		})
+	}
+
+	sw.WriteRows([]xlsx.Row{header})
+
 	rows, err := db.Query(fmt.Sprintf("SELECT * FROM [%s]", tableName))
 	if err != nil {
 		return err
@@ -189,17 +199,22 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !tableNameCheck.MatchString(requestedTable) && requestedTable != "" {
-		panic(fmt.Sprintf("Invalid table name: %s", requestedTable))
+		http.Error(w, fmt.Sprintf("Invalid table name: %s", requestedTable), http.StatusNotFound)
+		return
 	}
 
 	db, err := sql.Open("sqlite3", os.ExpandEnv("$HOME/scraperwiki.sqlite"))
 	if err != nil {
-		panic(err)
+		log.Print(err)
+		http.Error(w, "500: Problem opening database.", http.StatusInternalServerError)
+		return
 	}
 
 	tableNames, err := TableNames(db)
 	if err != nil {
-		panic(err)
+		log.Print(err)
+		http.Error(w, "500: Could not retrieve table names.", http.StatusInternalServerError)
+		return
 	}
 
 	var tablesToWrite []string
@@ -208,38 +223,52 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if requestedTable == "" {
 		requestedTable = "all_tables"
 		tablesToWrite = tableNames
-		gridsToWrite, err = AllGrids(db)
+		if contains(tableNames, "_grids") {
+			gridsToWrite, err = AllGrids(db)
+			if err != nil {
+				log.Print(err)
+				http.Error(w, "500: Could not get grids.", http.StatusInternalServerError)
+				return
+			}
+		}
+	} else if contains(tableNames, "_grids") && pageNumParse.MatchString(requestedTable) {
+		pageNumString := pageNumParse.ReplaceAllString(requestedTable, "$1")
+		pageNum, err := strconv.Atoi(pageNumString)
 		if err != nil {
-			panic(err)
+			http.Error(w, fmt.Sprintf("404: Invalid page number.", pageNumString), http.StatusNotFound)
+			return
+		}
+
+		gridURL, err := GridURL(db, pageNum)
+		switch {
+		case err == sql.ErrNoRows:
+			http.Error(w, fmt.Sprintf("404: Page %v does not exist.", pageNum), http.StatusNotFound)
+		case err != nil:
+			log.Printf("Error in GridURL: %v", err)
+			http.Error(w, "", http.StatusInternalServerError)
+			return
+		default:
+			gridTitle, err := GridTitle(db, pageNum)
+			if err != nil {
+				log.Print(err)
+				http.Error(w, fmt.Sprintf("500: Could not get grid title for page %v", pageNum), http.StatusInternalServerError)
+				return
+			}
+			gridsToWrite = append(gridsToWrite, struct{ URL, Title string }{gridURL, gridTitle})
 		}
 	} else {
-		if contains(tableNames, "_grids") && pageNumParse.MatchString(requestedTable) {
-			pageNum, err := strconv.Atoi(pageNumParse.ReplaceAllString(requestedTable, "$1"))
-			if err != nil {
-				panic(err)
-			}
 
-			gridURL, err := GridURL(db, pageNum)
-			switch {
-			case err == sql.ErrNoRows:
-				panic(fmt.Sprintf("Page %v does not exist", pageNum))
-			case err != nil:
-				panic(err)
-			default:
-				gridTitle, err := GridTitle(db, pageNum)
-				if err != nil {
-					panic(err)
-				}
-				gridsToWrite = append(gridsToWrite, struct{ URL, Title string }{gridURL, gridTitle})
-			}
+		if contains(tableNames, requestedTable) {
+			tablesToWrite = append(tablesToWrite, requestedTable)
 		} else {
-
-			if contains(tableNames, requestedTable) {
-				tablesToWrite = append(tablesToWrite, requestedTable)
-			} else {
-				panic(fmt.Sprintf("Table %s does not exist", requestedTable))
-			}
+			http.Error(w, fmt.Sprintf("404: Table %s does not exist.", requestedTable), http.StatusNotFound)
+			return
 		}
+	}
+
+	if len(tablesToWrite) == 0 && len(gridsToWrite) == 0 {
+		http.Error(w, "404: No tables found.", http.StatusNotFound)
+		return
 	}
 
 	w.Header().Set("Content-Disposition", "attachment; filename="+requestedTable+".xlsx")
@@ -253,7 +282,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		if !strings.HasPrefix(tableName, "_") || devTables {
 			err = WriteSheet(ww, db, tableName)
 			if err != nil {
-				panic(err)
+				log.Print(err)
+				http.Error(w, "500: Could write sheet", http.StatusInternalServerError)
+				return
 			}
 		}
 	}
@@ -268,7 +299,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	for table := range tables {
 		err = WriteGridSheet(ww, table)
 		if err != nil {
-			panic(err)
+			log.Print(err)
+			http.Error(w, "500: Could not write grid", http.StatusInternalServerError)
+			return
 		}
 	}
 }

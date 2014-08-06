@@ -18,7 +18,7 @@ var (
 
 func AllGrids(db *sql.DB) ([]struct{ URL, Title string }, error) {
 	gridsToWrite := []struct{ URL, Title string }{}
-	rows, err := db.Query("SELECT url, title from _GRIDS where number>0")
+	rows, err := db.Query("SELECT url, title FROM _grids WHERE number>0")
 	if err != nil {
 		return nil, err
 	}
@@ -35,14 +35,14 @@ func AllGrids(db *sql.DB) ([]struct{ URL, Title string }, error) {
 }
 
 func GridURL(db *sql.DB, pageNum int) (string, error) {
-	row := db.QueryRow("SELECT url FROM _grids where number=?", pageNum)
+	row := db.QueryRow("SELECT url FROM _grids WHERE number=?", pageNum)
 	var gridURL string
 	err := row.Scan(&gridURL)
 	return gridURL, err
 }
 
 func GridTitle(db *sql.DB, pageNum int) (string, error) {
-	row := db.QueryRow("SELECT title FROM _grids where number=?", pageNum)
+	row := db.QueryRow("SELECT title FROM _grids WHERE number=?", pageNum)
 	var title string
 	err := row.Scan(&title)
 	return title, err
