@@ -250,7 +250,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	defer ww.Close()
 
 	for _, tableName := range tablesToWrite {
-		// TODO: all tables option
 		if !strings.HasPrefix(tableName, "_") || devTables {
 			err = WriteSheet(ww, db, tableName)
 			if err != nil {
