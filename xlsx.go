@@ -214,7 +214,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		if contains(tableNames, "_grids") && pageNumParse.MatchString(requestedTable) {
-			// TODO: handle all grids at once case
 			pageNum, err := strconv.Atoi(pageNumParse.ReplaceAllString(requestedTable, "$1"))
 			if err != nil {
 				panic(err)
