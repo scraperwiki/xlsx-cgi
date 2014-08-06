@@ -133,7 +133,7 @@ func PopulateRow(r xlsx.Row, values []interface{}) error {
 				Type:  xlsx.CellTypeInlineString,
 				Value: fmt.Sprintf("%s", v),
 			}
-		case uint8, uint16, uint32, uint64, int8, int16, int32, int64, float32, float64:
+		case uint8, uint16, uint32, uint64, int8, int16, int32, int64, float32, float64, bool:
 			r.Cells[i] = xlsx.Cell{
 				Type:  xlsx.CellTypeNumber,
 				Value: fmt.Sprintf("%v", v),
