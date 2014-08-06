@@ -8,6 +8,8 @@ import (
 	"net/http/cgi"
 	"os"
 	"regexp"
+	"strconv"
+	"strings"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -15,12 +17,13 @@ import (
 )
 
 var (
-	tableNameCheck = regexp.MustCompile(`^[0-9a-z_]+$`)
-	pathParse      = regexp.MustCompile(`\/[a-z0-9]+\/[a-z0-9]+\/cgi-bin\/xlsx\/?([0-9a-z_]*)\/?`)
+	tableNameCheck = regexp.MustCompile(`^[0-9a-zA-Z_]+$`)
+	pageNumParse   = regexp.MustCompile(`page_([0-9]+)`)
+	pathParse      = regexp.MustCompile(`\/[a-z0-9]+\/[a-z0-9]+\/cgi-bin\/xlsx(?:\/([0-9a-zA-Z_]+)\/?|\/?)$`)
 )
 
 func TableNames(db *sql.DB) ([]string, error) {
-	rows, err := db.Query("SELECT name FROM sqlite_master")
+	rows, err := db.Query(`SELECT tbl_name FROM sqlite_master where type="table"`)
 	if err != nil {
 		return nil, err
 	}
@@ -101,6 +104,11 @@ func PopulateRow(r xlsx.Row, values []interface{}) error {
 				Type:  xlsx.CellTypeNumber,
 				Value: fmt.Sprintf("%v", v),
 			}
+		case bool:
+			r.Cells[i] = xlsx.Cell{
+				Type:  xlsx.CellTypeInlineString,
+				Value: fmt.Sprintf("%v", v),
+			}
 		default:
 			r.Cells[i] = xlsx.Cell{
 				Type:  xlsx.CellTypeInlineString,
@@ -174,11 +182,17 @@ func contains(s []string, e string) bool {
 func Handler(w http.ResponseWriter, r *http.Request) {
 	requestedTable := pathParse.ReplaceAllString(r.URL.Path, "$1")
 
+	var devTables bool
+
+	if contains(r.URL.Query()["devTables"], "true") {
+		devTables = true
+	}
+
 	if !tableNameCheck.MatchString(requestedTable) && requestedTable != "" {
 		panic(fmt.Sprintf("Invalid table name: %s", requestedTable))
 	}
 
-	db, err := sql.Open("sqlite3", "/home/scraperwiki.sqlite")
+	db, err := sql.Open("sqlite3", os.ExpandEnv("$HOME/scraperwiki.sqlite"))
 	if err != nil {
 		panic(err)
 	}
@@ -189,14 +203,42 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var tablesToWrite []string
+	gridsToWrite := []struct{ URL, Title string }{}
+
 	if requestedTable == "" {
-		tablesToWrite = tableNames
 		requestedTable = "all_tables"
+		tablesToWrite = tableNames
+		gridsToWrite, err = AllGrids(db)
+		if err != nil {
+			panic(err)
+		}
 	} else {
-		if contains(tableNames, requestedTable) {
-			tablesToWrite = append(tablesToWrite, requestedTable)
+		if contains(tableNames, "_grids") && pageNumParse.MatchString(requestedTable) {
+			pageNum, err := strconv.Atoi(pageNumParse.ReplaceAllString(requestedTable, "$1"))
+			if err != nil {
+				panic(err)
+			}
+
+			gridURL, err := GridURL(db, pageNum)
+			switch {
+			case err == sql.ErrNoRows:
+				panic(fmt.Sprintf("Page %v does not exist", pageNum))
+			case err != nil:
+				panic(err)
+			default:
+				gridTitle, err := GridTitle(db, pageNum)
+				if err != nil {
+					panic(err)
+				}
+				gridsToWrite = append(gridsToWrite, struct{ URL, Title string }{gridURL, gridTitle})
+			}
 		} else {
-			panic(fmt.Sprintf("Table %s does not exist", requestedTable))
+
+			if contains(tableNames, requestedTable) {
+				tablesToWrite = append(tablesToWrite, requestedTable)
+			} else {
+				panic(fmt.Sprintf("Table %s does not exist", requestedTable))
+			}
 		}
 	}
 
@@ -205,14 +247,30 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 	ww := xlsx.NewWorkbookWriter(w)
+	defer ww.Close()
+
 	for _, tableName := range tablesToWrite {
-		err = WriteSheet(ww, db, tableName)
+		if !strings.HasPrefix(tableName, "_") || devTables {
+			err = WriteSheet(ww, db, tableName)
+			if err != nil {
+				panic(err)
+			}
+		}
+	}
+
+	tables := make(chan HTMLTable)
+	go func() {
+		defer close(tables)
+		for _, grid := range gridsToWrite {
+			ParseHTML(grid.URL, tables, grid.Title)
+		}
+	}()
+	for table := range tables {
+		err = WriteGridSheet(ww, table)
 		if err != nil {
 			panic(err)
 		}
 	}
-	err = ww.Close()
-
 }
 
 func main() {
