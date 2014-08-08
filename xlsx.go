@@ -14,12 +14,14 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/psmithuk/xlsx"
+	"github.com/scraperwiki/xlsx-cgi/grids"
 )
 
 var (
 	tableNameCheck = regexp.MustCompile(`^[0-9a-zA-Z_]+$`)
 	pageNumParse   = regexp.MustCompile(`page_([0-9]+)`)
 	pathParse      = regexp.MustCompile(`\/[a-z0-9]+\/[a-z0-9]+\/cgi-bin\/[^/]+(?:\/([0-9a-zA-Z_]+)\/?|\/?)$`)
+	gridPathParse  = regexp.MustCompile(`.*(\/http\/grids\/[a-z0-9_]+\.html)`)
 )
 
 func TableNames(db *sql.DB) ([]string, error) {
@@ -255,7 +257,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		requestedTable = "all_tables"
 		tablesToWrite = tableNames
 		if contains(tableNames, "_grids") {
-			gridsToWrite, err = AllGrids(db)
+			gridsToWrite, err = grids.AllGrids(db)
 			if err != nil {
 				log.Print(err)
 				http.Error(w, "500: Could not get grids.", http.StatusInternalServerError)
@@ -270,7 +272,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		gridURL, err := GridURL(db, pageNum)
+		gridURL, err := grids.GridURL(db, pageNum)
 		switch {
 		case err == sql.ErrNoRows:
 			http.Error(w, fmt.Sprintf("404: Page %v does not exist.", pageNum), http.StatusNotFound)
@@ -279,7 +281,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		default:
-			gridTitle, err := GridTitle(db, pageNum)
+			gridTitle, err := grids.GridTitle(db, pageNum)
 			if err != nil {
 				log.Print(err)
 				http.Error(w, fmt.Sprintf("500: Could not get grid title for page %v", pageNum), http.StatusInternalServerError)
@@ -320,15 +322,21 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	tables := make(chan HTMLTable)
+	tables := make(chan grids.HTMLTable)
 	go func() {
 		defer close(tables)
 		for _, grid := range gridsToWrite {
-			ParseHTML(grid.URL, tables, grid.Title)
+			gridPath := gridPathParse.ReplaceAllString(grid.URL, "$1")
+
+			f, err := os.Open(os.ExpandEnv("$HOME" + gridPath))
+			if err != nil {
+				panic(err)
+			}
+			grids.ParseHTML(f, tables, grid.Title)
 		}
 	}()
 	for table := range tables {
-		err = WriteGridSheet(ww, table)
+		err = grids.WriteGridSheet(ww, table)
 		if err != nil {
 			log.Print(err)
 			http.Error(w, "500: Could not write grid", http.StatusInternalServerError)
