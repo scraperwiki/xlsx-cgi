@@ -1,6 +1,6 @@
 # Project specific binaries
 
-xlsx
+xlsx-cgi
 
 # Test workbooks
 *.xlsx
