@@ -153,7 +153,7 @@ findFirstTr:
 				}
 			}
 		case html.EndTagToken:
-			if z.Token().Data == "tbody" {
+			if z.Token().Data == "table" {
 				return
 			}
 		}
