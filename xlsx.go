@@ -19,7 +19,7 @@ import (
 var (
 	tableNameCheck = regexp.MustCompile(`^[0-9a-zA-Z_]+$`)
 	pageNumParse   = regexp.MustCompile(`page_([0-9]+)`)
-	pathParse      = regexp.MustCompile(`\/[a-z0-9]+\/[a-z0-9]+\/cgi-bin\/xlsx(?:\/([0-9a-zA-Z_]+)\/?|\/?)$`)
+	pathParse      = regexp.MustCompile(`\/[a-z0-9]+\/[a-z0-9]+\/cgi-bin\/[^/]+(?:\/([0-9a-zA-Z_]+)\/?|\/?)$`)
 )
 
 func TableNames(db *sql.DB) ([]string, error) {
