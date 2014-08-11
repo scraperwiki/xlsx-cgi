@@ -103,6 +103,7 @@ type HTMLCell struct {
 
 func ParseHTML(f io.Reader, tables chan<- HTMLTable, title string) {
 	z := html.NewTokenizer(f)
+	tableCount := 1
 
 	for {
 		switch z.Next() {
@@ -111,7 +112,8 @@ func ParseHTML(f io.Reader, tables chan<- HTMLTable, title string) {
 
 		case html.StartTagToken:
 			if z.Token().Data == "table" {
-				ParseHTMLTable(z, tables, title)
+				ParseHTMLTable(z, tables, fmt.Sprintf("%s Table %v", title, tableCount))
+				tableCount += 1
 			}
 		}
 	}
