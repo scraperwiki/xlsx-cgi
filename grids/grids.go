@@ -1,19 +1,14 @@
-package main
+package grids
 
 import (
 	"database/sql"
 	"fmt"
-	"os"
-	"regexp"
+	"io"
 	"strconv"
 
 	"code.google.com/p/go.net/html"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/psmithuk/xlsx"
-)
-
-var (
-	gridPathParse = regexp.MustCompile(`.*(\/http\/grids\/[a-z0-9_]+\.html)`)
 )
 
 func AllGrids(db *sql.DB) ([]struct{ URL, Title string }, error) {
@@ -106,15 +101,9 @@ type HTMLCell struct {
 	Colspan uint64
 }
 
-func ParseHTML(gridURL string, tables chan<- HTMLTable, title string) {
-	gridPath := gridPathParse.ReplaceAllString(gridURL, "$1")
-
-	f, err := os.Open(os.ExpandEnv("$HOME" + gridPath))
-	if err != nil {
-		panic(err)
-	}
-
+func ParseHTML(f io.Reader, tables chan<- HTMLTable, title string) {
 	z := html.NewTokenizer(f)
+	tableCount := 1
 
 	for {
 		switch z.Next() {
@@ -123,7 +112,8 @@ func ParseHTML(gridURL string, tables chan<- HTMLTable, title string) {
 
 		case html.StartTagToken:
 			if z.Token().Data == "table" {
-				ParseHTMLTable(z, tables, title)
+				ParseHTMLTable(z, tables, fmt.Sprintf("%s Table %v", title, tableCount))
+				tableCount += 1
 			}
 		}
 	}
@@ -165,7 +155,7 @@ findFirstTr:
 				}
 			}
 		case html.EndTagToken:
-			if z.Token().Data == "tbody" {
+			if z.Token().Data == "table" {
 				return
 			}
 		}
