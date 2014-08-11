@@ -42,43 +42,41 @@ func TableNames(db *sql.DB) ([]string, error) {
 	return tableNames, err
 }
 
-func RowCount(db *sql.DB, tablename string) (int, error) {
-	row := db.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM [%s]", tablename))
-	var rowCount int
-	err := row.Scan(&rowCount)
-	return rowCount, err
-}
-
-func ColumnTypes(db *sql.DB, tablename string) ([]xlsx.Column, []interface{}, []interface{}, error) {
+func ColumnDefinions(db *sql.DB, tablename string) (colNames, colTypes []string, err error) {
 	rows, err := db.Query(fmt.Sprintf("SELECT * FROM [%s] limit 1", tablename))
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
-	cols, err := rows.Columns()
+	colNames, err = rows.Columns()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
-	values := make([]interface{}, len(cols))
-	scanArgs := make([]interface{}, len(cols))
+	rows, err = db.Query(fmt.Sprintf("PRAGMA table_info([%s])", tablename))
+
+	for rows.Next() {
+		var colType string
+		unused := []byte{}
+		u := &unused
+		err := rows.Scan(u, u, &colType, u, u, u)
+		if err != nil {
+			return nil, nil, err
+		}
+		colTypes = append(colTypes, colType)
+	}
+
+	return colNames, colTypes, err
+}
+
+func ColumnStorage(db *sql.DB, tablename string, nColumns int) ([]interface{}, []interface{}, error) {
+	values := make([]interface{}, nColumns)
+	scanArgs := make([]interface{}, nColumns)
 	for i := range values {
 		scanArgs[i] = &values[i]
 	}
 
-	rows.Next()
-	err = rows.Scan(scanArgs...)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	var c []xlsx.Column
-
-	for _, colName := range cols {
-		c = append(c, xlsx.Column{Name: colName, Width: 10})
-	}
-
-	return c, values, scanArgs, nil
+	return values, scanArgs, nil
 }
 
 func PopulateRow(r xlsx.Row, values []interface{}) error {
@@ -120,42 +118,58 @@ func PopulateRow(r xlsx.Row, values []interface{}) error {
 	return nil
 }
 
-func WriteSheet(ww *xlsx.WorkbookWriter, db *sql.DB, tableName string) error {
-	rowCount, err := RowCount(db, tableName)
+func WriteSheet(ww *xlsx.WorkbookWriter, db *sql.DB, tablename string) error {
+
+	colNames, colTypes, err := ColumnDefinions(db, tablename)
+	_ = colTypes
+	if err != nil {
+		return fmt.Errorf("failed to get column definitions: %q", err)
+	}
+
+	nColumns := len(colNames)
+	storage, storagePtrs, err := ColumnStorage(db, tablename, nColumns)
 	if err != nil {
 		return err
 	}
 
-	cols, values, scanArgs, err := ColumnTypes(db, tableName)
-	if err != nil {
-		return err
+	var xlsxCols []xlsx.Column
+	header := xlsx.Row{[]xlsx.Cell{}}
+
+	for _, colName := range colNames {
+		header.Cells = append(header.Cells, xlsx.Cell{
+			Type:  xlsx.CellTypeInlineString,
+			Value: colName,
+		})
+		xlsxCols = append(xlsxCols, xlsx.Column{Name: colName, Width: 10})
 	}
 
-	sh := xlsx.NewSheetWithColumns(cols)
-	sh.Title = tableName
+	sh := xlsx.NewSheetWithColumns(xlsxCols)
+	sh.Title = tablename
 	sw, err := ww.NewSheetWriter(&sh)
 	if err != nil {
 		return err
 	}
 
-	header := xlsx.Row{[]xlsx.Cell{}}
-	for _, col := range cols {
-		header.Cells = append(header.Cells, xlsx.Cell{
-			Type:  xlsx.CellTypeInlineString,
-			Value: col.Name,
-		})
-	}
-
-	sw.WriteRows([]xlsx.Row{header})
-
-	rows, err := db.Query(fmt.Sprintf("SELECT * FROM [%s]", tableName))
+	err = sw.WriteRows([]xlsx.Row{header})
 	if err != nil {
 		return err
 	}
 
-	for i := 0; i < rowCount; i++ {
-		rows.Next()
-		err = rows.Scan(scanArgs...)
+	rows, err := db.Query(fmt.Sprintf("SELECT * FROM [%s]", tablename))
+	if err != nil {
+		return err
+	}
+
+	scan := func() ([]interface{}, error) {
+		err = rows.Scan(storagePtrs...)
+		if err != nil {
+			return nil, nil
+		}
+		return storage, nil
+	}
+
+	for rows.Next() {
+		values, err := scan()
 		if err != nil {
 			return err
 		}
