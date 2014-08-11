@@ -87,6 +87,11 @@ func PopulateRow(r xlsx.Row, values []interface{}) error {
 				Type:  xlsx.CellTypeInlineString,
 				Value: "",
 			}
+		case Date:
+			r.Cells[i] = xlsx.Cell{
+				Type:  xlsx.CellTypeDate,
+				Value: v.Format(time.RFC3339),
+			}
 		case time.Time:
 			r.Cells[i] = xlsx.Cell{
 				Type:  xlsx.CellTypeDatetime,
@@ -118,10 +123,11 @@ func PopulateRow(r xlsx.Row, values []interface{}) error {
 	return nil
 }
 
+type Date struct{ time.Time }
+
 func WriteSheet(ww *xlsx.WorkbookWriter, db *sql.DB, tablename string) error {
 
 	colNames, colTypes, err := ColumnDefinions(db, tablename)
-	_ = colTypes
 	if err != nil {
 		return fmt.Errorf("failed to get column definitions: %q", err)
 	}
@@ -165,7 +171,18 @@ func WriteSheet(ww *xlsx.WorkbookWriter, db *sql.DB, tablename string) error {
 		if err != nil {
 			return nil, nil
 		}
-		return storage, nil
+
+		// Re-cast 'date' values as the 'Date' type so that we can pass them
+		// to Excel in the right form.
+		var result []interface{}
+		for i, v := range storage {
+			switch colTypes[i] {
+			case "date":
+				v = Date{v.(time.Time)}
+			}
+			result = append(result, v)
+		}
+		return result, nil
 	}
 
 	for rows.Next() {
