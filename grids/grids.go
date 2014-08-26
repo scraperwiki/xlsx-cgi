@@ -68,6 +68,7 @@ func WriteGridSheet(ww *xlsx.WorkbookWriter, table HTMLTable) error {
 				Type:    xlsx.CellTypeInlineString,
 				Value:   htmlCell.Text,
 				Colspan: htmlCell.Colspan,
+				Rowspan: htmlCell.Rowspan,
 			}
 			i += htmlCell.Colspan
 		}
