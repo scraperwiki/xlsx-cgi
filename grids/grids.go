@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
-	"log"
 	"strconv"
 
 	"code.google.com/p/go.net/html"
@@ -69,14 +68,13 @@ func WriteGridSheet(ww *xlsx.WorkbookWriter, table HTMLTable) error {
 		ghostCellRow, ok := ghostCells[x]
 		if ok {
 			for _, ghostCellY := range ghostCellRow {
-				sheetRow.Cells[ghostCellY] = xlsx.Cell{xlsx.CellTypeInlineString, "Foo", 1, 1}
-				log.Printf("Ghost: x:%v, y:%v\n", ghostCellY, x)
+				sheetRow.Cells[ghostCellY] = xlsx.Cell{xlsx.CellTypeInlineString, "", 1, 1}
 			}
 		}
 
 		var y uint64
 		for _, htmlCell := range htmlRow {
-			if sheetRow.Cells[y].Type == 4 {
+			for sheetRow.Cells[y].Type == 4 {
 				y += 1
 			}
 			sheetRow.Cells[y] = xlsx.Cell{
@@ -88,7 +86,10 @@ func WriteGridSheet(ww *xlsx.WorkbookWriter, table HTMLTable) error {
 
 			var i uint64
 			for i = 1; i < htmlCell.Rowspan; i++ {
-				ghostCells[x+i] = append(ghostCells[x+1], y)
+				var j uint64
+				for j = 0; j < htmlCell.Colspan; j++ {
+					ghostCells[x+i] = append(ghostCells[x+i], y+j)
+				}
 			}
 			y += htmlCell.Colspan
 		}
@@ -99,7 +100,6 @@ func WriteGridSheet(ww *xlsx.WorkbookWriter, table HTMLTable) error {
 			return err
 		}
 	}
-	log.Print("\n")
 	return nil
 }
 
