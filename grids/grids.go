@@ -60,11 +60,16 @@ func WriteGridSheet(ww *xlsx.WorkbookWriter, table HTMLTable) error {
 		panic(err)
 	}
 
+	// Ghost cells are extra merged cells that need to be inserted as a
+	// result of combinations of colspans and rowspans in the grids.
+	// This happens because we don't have vertical size information
+	// about the grids when dealing with them as a stream.
 	ghostCells := make(map[uint64][]uint64)
 	var x uint64
 	for htmlRow := range table.Rows {
 		sheetRow := sh.NewRow()
 
+		// If there should be ghost cells on this row, insert them now
 		ghostCellRow, ok := ghostCells[x]
 		if ok {
 			for _, ghostCellY := range ghostCellRow {
@@ -74,7 +79,8 @@ func WriteGridSheet(ww *xlsx.WorkbookWriter, table HTMLTable) error {
 
 		var y uint64
 		for _, htmlCell := range htmlRow {
-			for sheetRow.Cells[y].Type == 4 {
+			// If a ghost cell is already here, move along one
+			for sheetRow.Cells[y].Type == xlsx.CellTypeInlineString {
 				y += 1
 			}
 			sheetRow.Cells[y] = xlsx.Cell{
