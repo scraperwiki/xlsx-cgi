@@ -60,17 +60,62 @@ func WriteGridSheet(ww *xlsx.WorkbookWriter, table HTMLTable) error {
 		panic(err)
 	}
 
+	// Ghost cells are extra merged cells that need to be inserted as a
+	// result of combinations of colspans and rowspans in the grids.
+	// This happens because we don't have vertical size information
+	// about the grids when dealing with them as a stream.
+	ghostCells := make(map[uint64][]uint64)
+	var x uint64
 	for htmlRow := range table.Rows {
 		sheetRow := sh.NewRow()
-		var i uint64
+
+		// If there should be ghost cells on this row, insert them now
+		ghostCellRow, ok := ghostCells[x]
+		if ok {
+			if len(ghostCellRow) == len(sheetRow.Cells) {
+				for len(ghostCellRow) == len(sheetRow.Cells) {
+					err = sw.WriteRows([]xlsx.Row{sheetRow})
+					if err != nil {
+						return err
+					}
+					sheetRow = sh.NewRow()
+					x += 1
+					ghostCellRow, ok = ghostCells[x]
+					if !ok {
+						break
+					}
+				}
+			} else {
+				for _, ghostCellY := range ghostCellRow {
+					sheetRow.Cells[ghostCellY] = xlsx.Cell{xlsx.CellTypeInlineString, "", 1, 1}
+				}
+			}
+		}
+
+		var y uint64
 		for _, htmlCell := range htmlRow {
-			sheetRow.Cells[i] = xlsx.Cell{
+			// If a ghost cell is already here, move along one
+			for sheetRow.Cells[y].Type == xlsx.CellTypeInlineString {
+				y += 1
+			}
+
+			sheetRow.Cells[y] = xlsx.Cell{
 				Type:    xlsx.CellTypeInlineString,
 				Value:   htmlCell.Text,
 				Colspan: htmlCell.Colspan,
+				Rowspan: htmlCell.Rowspan,
 			}
-			i += htmlCell.Colspan
+
+			for i := uint64(1); i < htmlCell.Rowspan; i++ {
+				for j := uint64(0); j < htmlCell.Colspan; j++ {
+					ghostCells[x+i] = append(ghostCells[x+i], y+j)
+				}
+			}
+
+			y += htmlCell.Colspan
 		}
+
+		x += 1
 		err = sw.WriteRows([]xlsx.Row{sheetRow})
 		if err != nil {
 			return err
