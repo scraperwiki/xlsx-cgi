@@ -90,10 +90,8 @@ func WriteGridSheet(ww *xlsx.WorkbookWriter, table HTMLTable) error {
 				Rowspan: htmlCell.Rowspan,
 			}
 
-			var i uint64
-			for i = 1; i < htmlCell.Rowspan; i++ {
-				var j uint64
-				for j = 0; j < htmlCell.Colspan; j++ {
+			for i := uint64(1); i < htmlCell.Rowspan; i++ {
+				for j := uint64(0); j < htmlCell.Colspan; j++ {
 					ghostCells[x+i] = append(ghostCells[x+i], y+j)
 				}
 			}
