@@ -72,8 +72,23 @@ func WriteGridSheet(ww *xlsx.WorkbookWriter, table HTMLTable) error {
 		// If there should be ghost cells on this row, insert them now
 		ghostCellRow, ok := ghostCells[x]
 		if ok {
-			for _, ghostCellY := range ghostCellRow {
-				sheetRow.Cells[ghostCellY] = xlsx.Cell{xlsx.CellTypeInlineString, "", 1, 1}
+			if len(ghostCellRow) == len(sheetRow.Cells) {
+				for len(ghostCellRow) == len(sheetRow.Cells) {
+					err = sw.WriteRows([]xlsx.Row{sheetRow})
+					if err != nil {
+						return err
+					}
+					sheetRow = sh.NewRow()
+					x += 1
+					ghostCellRow, ok = ghostCells[x]
+					if !ok {
+						break
+					}
+				}
+			} else {
+				for _, ghostCellY := range ghostCellRow {
+					sheetRow.Cells[ghostCellY] = xlsx.Cell{xlsx.CellTypeInlineString, "", 1, 1}
+				}
 			}
 		}
 
@@ -83,6 +98,7 @@ func WriteGridSheet(ww *xlsx.WorkbookWriter, table HTMLTable) error {
 			for sheetRow.Cells[y].Type == xlsx.CellTypeInlineString {
 				y += 1
 			}
+
 			sheetRow.Cells[y] = xlsx.Cell{
 				Type:    xlsx.CellTypeInlineString,
 				Value:   htmlCell.Text,
@@ -95,6 +111,7 @@ func WriteGridSheet(ww *xlsx.WorkbookWriter, table HTMLTable) error {
 					ghostCells[x+i] = append(ghostCells[x+i], y+j)
 				}
 			}
+
 			y += htmlCell.Colspan
 		}
 
