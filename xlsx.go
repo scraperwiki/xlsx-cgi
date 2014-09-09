@@ -13,7 +13,7 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/psmithuk/xlsx"
+	"github.com/scraperwiki/xlsx"
 	"github.com/scraperwiki/xlsx-cgi/grids"
 )
 
