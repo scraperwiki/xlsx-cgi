@@ -8,7 +8,7 @@ import (
 
 	"code.google.com/p/go.net/html"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/psmithuk/xlsx"
+	"github.com/scraperwiki/xlsx"
 )
 
 func AllGrids(db *sql.DB) ([]struct{ URL, Title string }, error) {
